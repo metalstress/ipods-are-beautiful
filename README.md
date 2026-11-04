@@ -48,6 +48,10 @@ The iPhone album import was checked against the device catalogue and stored file
 
 This is a personal prototype. Initial device setup is manual.
 
+## Library management (in development)
+
+The next interface has a [library backend in development](docs/library-api.md): album browsing, track/album deletion, artwork replacement, genre and release year. This source branch includes the backend; the downloadable 1.0.3 interface does not include these controls.
+
 ## Device setup
 
 **iPhone:** install Apple's device drivers, connect by USB and trust the PC first. Wi-Fi requires an existing pairing record, wireless sync enabled and both devices on the same local network. No jailbreak or OpenSSH is needed.

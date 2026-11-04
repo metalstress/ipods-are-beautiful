@@ -16,7 +16,9 @@ class ModernEngine:
         self.stop = stop if stop is not None else threading.Event()
 
     def transfer(self, paths):
-        return asyncio.run(self.run(paths))
+        from device_lock import device_lock
+        with device_lock(self.config):
+            return asyncio.run(self.run(paths))
 
     async def run(self, paths):
         paths = list({str(Path(p).resolve()).casefold(): Path(p).resolve() for p in paths}.values())

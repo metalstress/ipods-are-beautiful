@@ -4,7 +4,7 @@ Original signer: ../rustunes, commit 057ee8fc9c9da65795a6f14497fc408c2fe23c76.
 No database is written on the phone. Library IDs and pairing keys are not logged.
 """
 import asyncio
-from contextlib import AsyncExitStack, suppress
+from contextlib import AsyncExitStack, suppress, closing
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -56,7 +56,7 @@ def library_identity(data):
 
 
 def read_catalogue(path):
-    with sqlite3.connect(path) as db:
+    with closing(sqlite3.connect(path)) as db:
         db.row_factory = sqlite3.Row
         schema = db.execute('pragma user_version').fetchone()[0]
         if schema not in (2400060, 2410000):

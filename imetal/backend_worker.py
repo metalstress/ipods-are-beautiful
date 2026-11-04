@@ -20,6 +20,11 @@ def execute(directory):
             result={'devices':scan_devices(request['config']),
                     'diagnostics':{'profiles_loaded':len(load_profiles()),'profile_path':str(PROFILES),
                                    'worker_pid':os.getpid(),'qt_loaded':any(m.startswith('PySide6') for m in __import__('sys').modules)}}
+        elif request['command'].startswith('library.'):
+            from library_backend import LibraryService
+            with (directory/'events.jsonl').open('a',encoding='utf-8',buffering=1) as events:
+                def emit(event):events.write(json.dumps(event,ensure_ascii=False)+'\n')
+                result=LibraryService().execute(request['command'],request['config'],request.get('payload',{}),emit,FileStop(directory/'stop'))
         elif request['command']=='transfer':
             from modern_engine import ModernEngine
             with (directory/'events.jsonl').open('a',encoding='utf-8',buffering=1) as events:
@@ -29,6 +34,10 @@ def execute(directory):
             raise ValueError('Unknown backend command')
     except Exception as error:
         result={'error':str(error) or type(error).__name__}
+        if hasattr(error,'code'):
+            result.update(code=error.code,details=error.details)
+        elif request['command'].startswith('library.'):
+            result.update(code='device_timeout' if isinstance(error,TimeoutError) else 'library_failed',details={})
         from modern_devices import record_failure
         record_failure('Headless backend',error)
         (directory/'error.txt').write_text(traceback.format_exc(),encoding='utf-8')

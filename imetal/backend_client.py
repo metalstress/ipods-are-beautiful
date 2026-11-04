@@ -15,12 +15,14 @@ def worker_command(directory):
     return [sys.executable,str(Path(__file__).with_name('app.py')),'--backend-job',str(directory)]
 
 
-def run_backend(command,config,paths=None,emit=lambda event:None,stop=None):
+def run_backend(command,config,paths=None,emit=lambda event:None,stop=None,payload=None):
     jobs=DATA/'backend-jobs'
     jobs.mkdir(parents=True,exist_ok=True)
     directory=jobs/uuid.uuid4().hex
     directory.mkdir()
     request={'command':command,'config':config,'paths':[str(p) for p in paths or []]}
+    if payload is not None:
+        request['payload']=payload
     (directory/'request.json').write_text(json.dumps(request),encoding='utf-8')
     pending='';offset=0;cancelled=False
     def drain():

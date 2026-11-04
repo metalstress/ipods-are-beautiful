@@ -281,6 +281,11 @@ class Engine:
             return session.info()
 
     def transfer(self, paths):
+        from device_lock import device_lock
+        with device_lock(self.config):
+            return self._transfer(paths)
+
+    def _transfer(self, paths):
         paths = list({str(Path(p).resolve()).casefold(): Path(p).resolve() for p in paths}.values())
         imported, skipped, errors = 0, 0, 0
         total = len(paths)
