@@ -1,0 +1,6 @@
+{
+  "ip": "YOUR_IPOD_IP_ADDRESS",
+  "mode": "auto",
+  "key": "C:/path/to/your/private_ssh_key",
+  "host_key": "YOUR_COMPLETE_SSH_KNOWN_HOSTS_LINE"
+}

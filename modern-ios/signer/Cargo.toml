@@ -1,0 +1,16 @@
+[package]
+name = "ipods-music-signer"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+aes = "=0.8.4"
+anyhow = "1"
+cbc = "=0.1.2"
+hmac = "=0.12.1"
+sha1 = "=0.10.6"
+
+[dev-dependencies]
+plist = "1.8"

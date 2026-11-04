@@ -1,0 +1,65 @@
+[
+  {
+    "key": "logo",
+    "id": "I16:10432;12:8855",
+    "format": "SVG",
+    "width": 30.63043212890625,
+    "height": 33.89512252807617,
+    "file": "logo.svg",
+    "bytes": 1504
+  },
+  {
+    "key": "touch",
+    "id": "16:10450",
+    "format": "PNG",
+    "width": 33,
+    "height": 61,
+    "file": "touch.png",
+    "bytes": 53406
+  },
+  {
+    "key": "classic",
+    "id": "16:10463",
+    "format": "PNG",
+    "width": 32,
+    "height": 54,
+    "file": "classic.png",
+    "bytes": 32188
+  },
+  {
+    "key": "eject",
+    "id": "16:10458",
+    "format": "SVG",
+    "width": 9,
+    "height": 9,
+    "file": "eject.svg",
+    "bytes": 181
+  },
+  {
+    "key": "eject-help",
+    "id": "16:10478",
+    "format": "SVG",
+    "width": 9,
+    "height": 9,
+    "file": "eject-help.svg",
+    "bytes": 1056
+  },
+  {
+    "key": "dropdown",
+    "id": "16:10442",
+    "format": "SVG",
+    "width": 9,
+    "height": 9,
+    "file": "dropdown.svg",
+    "bytes": 234
+  },
+  {
+    "key": "check",
+    "id": "I16:10496;9:89",
+    "format": "SVG",
+    "width": 6.500000476837158,
+    "height": 6.500000476837158,
+    "file": "check.svg",
+    "bytes": 218
+  }
+]
