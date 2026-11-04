@@ -17,3 +17,13 @@ cargo test --manifest-path modern-ios/signer/Cargo.toml
 The Python suite covers PCM-preserving FLAC conversion, metadata, duplicate handling, pending-import cleanup, queue modes, cancellation, progress, light-theme controls, device discovery, paired Wi-Fi sessions, backend IPC and ATC keepalive handling. Protocol tests check catalogue identity and signed-operation construction. Rust tests use the pinned upstream vectors.
 
 Other hardware, fresh machine setup, every audio format, long-running stress transfers and future firmware updates have not been validated. iPod Classic has no implementation. The portfolio animation demonstrates the interaction and compresses transfer timing; it is not a speed benchmark.
+
+## Windows executable
+
+The standalone 1.0.3 executable was checked on Windows 11 x64 from an empty working directory, with Python removed from PATH and fresh local settings. Empty and iPhone UI previews rendered offscreen. The frozen backend processed an empty queue without connecting to a device. Bundled FFmpeg 7.1 and the Rust signer ran successfully; the executable contains Python 3.13, blank device defaults and third-party notices. PE metadata confirms x64 and version 1.0.3.
+
+The release ZIP passed its integrity check. These checks validate packaging on the development PC; they do not replace testing on a clean Windows installation.
+
+```powershell
+python tools/check_release.py path/to/iPods-Are-Beautiful-Windows-x64.exe path/to/check-output
+```

@@ -2,6 +2,8 @@
 
 Windows music uploader, version 1.0.3.
 
+Run iPods Are Beautiful.exe. Python, Rust and build tools are not required.
+
 Drag songs or albums into the window. With auto upload enabled, transfer starts immediately; otherwise press Upload after building the queue.
 
 The tested devices are a jailbroken iPod touch 4 on iOS 6.1.6 and an iPhone 16 Pro on iOS 27.0. USB and Wi-Fi are supported. Only one device can receive a transfer at a time.

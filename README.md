@@ -6,6 +6,14 @@ The code is AI-slopped. The design was made by hand, with love.
 
 ![App demo](docs/demo.webp)
 
+## Download
+
+[Download for Windows x64 (.exe)](https://github.com/metalstress/ipods-are-beautiful/releases/latest/download/iPods-Are-Beautiful-Windows-x64.exe)
+
+Run the downloaded executable. Python, Rust and build tools are not needed. A [ZIP with the executable and notices](https://github.com/metalstress/ipods-are-beautiful/releases/latest/download/iPods-Are-Beautiful-Windows-x64.zip) is also available.
+
+Apple device drivers and the device setup below are still required.
+
 ## What works
 
 - Drag and drop songs, folders or albums.
@@ -60,7 +68,7 @@ Copy-Item modern-ios/signer/target/release/ipods-music-signer.exe imetal/resourc
 .\.venv\Scripts\python.exe imetal/app.py
 ```
 
-Create a Windows build with `.\.venv\Scripts\python.exe imetal/build.py`.
+Create a folder-based Windows build with `.\.venv\Scripts\python.exe imetal/build.py`, or add `--onefile` for a standalone executable.
 
 ## Projects used
 

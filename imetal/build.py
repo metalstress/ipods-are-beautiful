@@ -12,6 +12,7 @@ NAME = "iPods Are Beautiful"
 parser = argparse.ArgumentParser()
 parser.add_argument('--dist-root', type=Path, default=WORKSPACE/'outputs')
 parser.add_argument('--build-root', type=Path, default=WORKSPACE/'work/ipods-build')
+parser.add_argument('--onefile', action='store_true', help='Create a standalone Windows executable')
 args = parser.parse_args()
 DIST = args.dist_root.resolve()
 BUILD = args.build_root.resolve()
@@ -26,12 +27,15 @@ BUILD.mkdir(parents=True, exist_ok=True)
 version_file = BUILD / 'windows-version.txt'
 version_file.write_text(windows_resource(), encoding='utf-8')
 command = [
-    sys.executable, "-m", "PyInstaller", "--noconfirm", "--onedir", "--windowed",
+    sys.executable, "-m", "PyInstaller", "--noconfirm",
+    "--onefile" if args.onefile else "--onedir", "--windowed",
     "--name", NAME, "--icon", str(ROOT / "resources/imetal.ico"),
     "--version-file", str(version_file),
     "--distpath", str(DIST), "--workpath", str(BUILD),
     "--specpath", str(BUILD), "--paths", str(ROOT),
     "--add-data", str(ROOT / "resources") + os.pathsep + "resources",
+    "--add-data", str(ROOT / "README.md") + os.pathsep + "resources",
+    "--add-data", str(ROOT / "THIRD_PARTY.md") + os.pathsep + "resources",
     "--add-data", ffmpeg() + os.pathsep + "resources",
     "--collect-submodules", "mutagen",
 ]
@@ -40,8 +44,22 @@ for module in ["imageio_ffmpeg", "PySide6.QtWebEngineCore",
                "PySide6.QtPdf", "PySide6.QtNetworkAuth"]:
     command += ["--exclude-module", module]
 command += [str(ROOT / "app.py")]
+# Exclude unrelated PATH entries that provide an incompatible ICU DLL before
+# collection. A standalone archive cannot have a collected DLL removed later.
+build_env = dict(os.environ)
+search_paths = []
+for entry in build_env.get('PATH', '').split(os.pathsep):
+    candidate = Path(entry) / 'icuuc.dll'
+    if candidate.is_file():
+        import pefile
+        with pefile.PE(str(candidate)) as image:
+            exports = {symbol.name for symbol in image.DIRECTORY_ENTRY_EXPORT.symbols}
+        if b'ucnv_open' not in exports:
+            continue
+    search_paths.append(entry)
+build_env['PATH'] = os.pathsep.join(search_paths)
 with (BUILD / "build.log").open("w", encoding="utf-8") as log:
-    result = subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
+    result = subprocess.run(command, cwd=ROOT, env=build_env, stdout=log, stderr=subprocess.STDOUT)
 if result.returncode:
     print((BUILD / "build.log").read_text(encoding="utf-8")[-7000:])
     raise SystemExit(result.returncode)
@@ -55,6 +73,7 @@ if icu.exists():
     pe.close()
     if b"ucnv_open" not in exports:
         icu.unlink()
+output = DIST if args.onefile else DIST / NAME
 for name in ["README.md", "THIRD_PARTY.md"]:
-    shutil.copyfile(ROOT / name, DIST / NAME / name)
-print("BUILT", DIST / NAME / (NAME + ".exe"), flush=True)
+    shutil.copyfile(ROOT / name, output / name)
+print("BUILT", output / (NAME + ".exe"), flush=True)
