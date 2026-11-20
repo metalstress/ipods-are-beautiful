@@ -1,6 +1,6 @@
 # iPods Are Beautiful & I'm No Longer Afraid to Die
 
-A Windows app for adding local music to the built-in Music app on an iPod touch or iPhone, over USB or Wi-Fi.
+A desktop app for adding local music to the built-in Music app on an iPod touch or iPhone, over USB or Wi-Fi. Windows is hardware-tested; the Apple Silicon Mac build is a preview.
 
 The code is AI-slopped. The design was made by hand, with love.
 
@@ -13,6 +13,10 @@ The code is AI-slopped. The design was made by hand, with love.
 Run the downloaded executable. Python, Rust and build tools are not needed. A [ZIP with the executable and notices](https://github.com/metalstress/ipods-are-beautiful/releases/latest/download/iPods-Are-Beautiful-Windows-x64.zip) is also available.
 
 Apple device drivers and the device setup below are still required.
+
+[Download the Apple Silicon Mac preview (.dmg)](https://github.com/metalstress/ipods-are-beautiful/releases/download/v1.2.0-macos-preview/iPods-Are-Beautiful-macOS-arm64.dmg)
+
+The Mac preview requires **macOS 14.4 or newer** and an M-series Mac. It uses the existing interface unchanged. It is ad-hoc signed, not notarized; first launch may require **System Settings → Privacy & Security → Open Anyway**. Mac device transfers still need hardware testing. Setup and build details: [docs/macos.md](docs/macos.md).
 
 ## What works in 1.1.1
 
@@ -49,7 +53,7 @@ For **1.1.1**, 157 application tests and 3 additional Music protocol tests passe
 - Other iPhones: currently rejected by the device-model check. Other iOS versions have not been validated.
 - Simultaneous uploads to multiple devices.
 - DRM files and streaming catalogue downloads; editing smart, system or cloud playlists.
-- Clean Windows installations, Windows 10, macOS and Linux have not been tested.
+- Clean Windows installations, Windows 10 and Linux have not been tested. Mac device transfers have not been tested; the ARM64 app and its bundled helpers passed native CI checks.
 - Not every input format or possible tag combination has been tested on hardware.
 
 This is a personal prototype. Initial device setup is manual.
@@ -68,7 +72,7 @@ Background artwork repair installed a missing cover on eleven existing iPhone so
 
 **iPod touch:** requires iOS 6.1.6, a jailbreak, OpenSSH and Cycript. Configure SSH key authentication and a pinned host key in `%LOCALAPPDATA%\iMetal\settings.json`; an example is in [docs/touch-settings.example.json](docs/touch-settings.example.json). The source checkout does not include the optional Cycript bootstrap packages.
 
-Settings, transfer journals and cache stay under `%LOCALAPPDATA%\iMetal`. Pairing records, private SSH keys, device backups and music files are not part of this repository.
+Settings, transfer journals and cache stay under `%LOCALAPPDATA%\iMetal` on Windows or `~/Library/Application Support/iMetal` on Mac. Pairing records, private SSH keys, device backups and music files are not part of this repository.
 
 ## Run from source
 
@@ -83,6 +87,8 @@ Copy-Item modern-ios/signer/target/release/ipods-music-signer.exe imetal/resourc
 ```
 
 Create a folder-based Windows build with `.\.venv\Scripts\python.exe imetal/build.py`, or add `--onefile` for a standalone executable.
+
+For the native ARM64 `.app` build, see [the Mac instructions](docs/macos.md). The Mac build keeps the same widgets, assets, measurements and light palette.
 
 ## Projects used
 

@@ -72,6 +72,10 @@ Regression checks cover protected/cloud exclusions, preserving a cover added dur
 
 157 application tests and 3 additional protocol tests passed for 1.1.1. The real headless worker was also run against the already-repaired Prodigy album over Wi-Fi and correctly performed no second mutation.
 
+### Apple Silicon preview — 1.2.0
+
+164 application tests passed on both Windows and a native GitHub macOS ARM64 runner. The Mac run also passed 3 Music protocol tests and 4 Rust signing-vector tests. Its `.app` passed frozen offscreen startup, library and background-worker checks. ARM64 architecture and the ad-hoc code signature were verified. No physical device was attached to the Mac runner; hardware transfers and macOS first-launch permission flows remain untested. See [macos.md](macos.md).
+
 ```powershell
 python tools/check_release.py path/to/iPods-Are-Beautiful-Windows-x64.exe path/to/check-output
 ```
