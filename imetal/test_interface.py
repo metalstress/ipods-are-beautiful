@@ -32,7 +32,7 @@ class InterfaceTests(unittest.TestCase):
 
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory()
-        self.root=Path(self.tmp.name)
+        self.root=Path(self.tmp.name).resolve()
         self.data_patch=patch('application.DATA',self.root);self.data_patch.start()
         self.a=self.root/'a.mp3';self.a.write_bytes(b'a'*10)
         self.b=self.root/'b.mp3';self.b.write_bytes(b'b'*20)

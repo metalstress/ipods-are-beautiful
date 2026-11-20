@@ -56,7 +56,7 @@ class Device:
 
 class ModernQueueTests(unittest.TestCase):
     def setUp(self):
-        self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name)
+        self.tmp=tempfile.TemporaryDirectory();self.root=Path(self.tmp.name).resolve()
         self.a=self.root/'a.flac';self.a.write_bytes(b'a'*10)
         self.b=self.root/'b.flac';self.b.write_bytes(b'b'*20)
         self.events=[]

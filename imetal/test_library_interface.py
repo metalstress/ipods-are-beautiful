@@ -212,7 +212,10 @@ class LibraryInterfaceTests(unittest.TestCase):
         scroll = self.pane.scroll.verticalScrollBar()
         with patch.object(self.pane, 'request_covers') as request:
             scroll.setValue(rows[3]['y'])
-            QTest.qWait(100)
+            for _ in range(20):
+                if request.called:break
+                QTest.qWait(50)
+        self.assertTrue(request.called,'Scrolling did not schedule album-cover prefetch.')
         keys = request.call_args.args[0]
         self.assertEqual(keys[0], album_cover_key(rows[3]['items'][0][1]['id']))
         first_below_view = next(row for row in rows

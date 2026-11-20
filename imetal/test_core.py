@@ -18,7 +18,7 @@ from host_platform import process_flags
 class CoreTests(unittest.TestCase):
     def test_discovery_filters_and_deduplicates_nested_paths(self):
         with tempfile.TemporaryDirectory() as tmp:
-            folder = Path(tmp)
+            folder = Path(tmp).resolve()
             album = folder / "album"
             album.mkdir()
             (album / "01.mp3").write_bytes(b"audio")
