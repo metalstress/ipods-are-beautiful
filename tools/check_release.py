@@ -10,6 +10,8 @@ import tempfile
 import pefile
 from PIL import Image
 from PyInstaller.archive.readers import CArchiveReader
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'imetal'))
+from version import VERSION
 
 
 def check(executable, output):
@@ -50,6 +52,27 @@ def check(executable, output):
         result = json.loads((job / 'result.json').read_text(encoding='utf-8'))
         assert result.get('tracks_total') == 0 and result.get('errors') == 0, result
 
+        # Exercise frozen library imports and request handling without a device.
+        from test_library import fixture
+        from library_catalogue import read_snapshot
+        from library_backend import LibraryCache
+        from library_devices import device_identity
+        config={'backend':'modern','udid':'packaging-fixture'}
+        database=root/'catalogue.db';fixture(database)
+        snapshot=read_snapshot(database,'iphone',device_identity(config)[1])
+        cache=LibraryCache(root/'local'/'iMetal'/'library-cache');cache.save('snapshots',snapshot)
+        for index,(command,payload) in enumerate([
+            ('library.browse',{'snapshot_id':snapshot['snapshot_id']}),
+            ('library.plan',{'snapshot_id':snapshot['snapshot_id'],'action':'create_playlist','name':'Packaging fixture'})
+        ]):
+            request=root/('library-'+str(index));request.mkdir()
+            (request/'request.json').write_text(json.dumps({'command':command,'config':config,'payload':payload}),encoding='utf-8')
+            run([str(executable),'--backend-job',str(request)])
+            response=json.loads((request/'result.json').read_text(encoding='utf-8'))
+            assert not response.get('error'),response
+            if command=='library.browse':assert len(response['tracks'])==4
+            else:assert response['action']=='create_playlist' and response['executable']
+
         archive = CArchiveReader(str(executable))
         names = {name.replace('\\', '/'): name for name in archive.toc}
         def extract(name):
@@ -71,12 +94,14 @@ def check(executable, output):
         with pefile.PE(str(executable)) as pe:
             assert pe.FILE_HEADER.Machine == 0x8664
             version = pe.VS_FIXEDFILEINFO[0]
-            assert (version.FileVersionMS, version.FileVersionLS) == (1 << 16, 3 << 16)
+            major,minor,patch=map(int,VERSION.split('.'))
+            assert (version.FileVersionMS, version.FileVersionLS) == ((major << 16)|minor,patch << 16)
 
     report = {'executable': str(executable), 'bytes': executable.stat().st_size,
               'sha256': hashlib.sha256(executable.read_bytes()).hexdigest(),
-              'version': '1.0.3', 'platform': 'Windows x64', 'offscreen_previews': ['empty', 'iphone'],
+              'version': VERSION, 'platform': 'Windows x64', 'offscreen_previews': ['empty', 'iphone'],
               'frozen_backend_empty_queue': True, 'packaged_signer': True, 'packaged_ffmpeg': True,
+              'frozen_library_catalogue': True, 'frozen_playlist_planning': True,
               'embedded_python': True, 'blank_device_defaults': True,
               'runtime_path_has_no_python': True, 'device_connection_attempted': False}
     (output / 'release-check.json').write_text(json.dumps(report, indent=2), encoding='utf-8')

@@ -14,19 +14,24 @@ Run the downloaded executable. Python, Rust and build tools are not needed. A [Z
 
 Apple device drivers and the device setup below are still required.
 
-## What works
+## What works in 1.1.0
 
 - Drag and drop songs, folders or albums.
 - Convert unsupported audio to ALAC. Compatible MP3, AAC and ALAC files pass through without re-encoding.
 - Transfer artwork and tags into the device's Music library.
+- Keep compilation tracks together using release IDs and a shared album artist. Conflicting release tags are left unchanged.
+- Look up missing import artwork through Deezer and MusicBrainz / Cover Art Archive; keep existing covers.
 - Upload immediately with **auto upload**, or collect a queue and press **Upload**.
 - Show imported tracks, transferred data, speed and device storage.
 - Check for existing tracks before importing. Keep the original files on the PC.
 - Eject the selected device and stop the remaining queue after the current operation finishes.
+- Browse albums, artists, songs and playlists on a selected device.
+- Delete songs or albums; change artwork, genre and release year.
+- Create, rename and delete ordinary playlists. Add selected songs, or edit a playlist's contents before pressing **Done**.
 
 ## Tested
 
-Version **1.0.3**, Windows 11 x64. Hardware testing was limited to these two devices:
+Windows 11 x64. Hardware testing was limited to these two devices:
 
 | Device | System | Checked |
 | --- | --- | --- |
@@ -35,22 +40,24 @@ Version **1.0.3**, Windows 11 x64. Hardware testing was limited to these two dev
 
 The iPhone album import was checked against the device catalogue and stored files. This does not mean every imported track was listened to end to end.
 
-**52 Python tests and 4 Rust signer tests passed** on November 4, 2026. They cover conversion, metadata, queue behaviour, cancellation, progress, discovery, pairing, interrupted imports, backend communication and the Music protocol. The signer uses upstream test vectors. Commands and hardware-test details are in [docs/testing.md](docs/testing.md).
+For **1.1.0**, 142 application tests and 3 additional Music protocol tests passed on November 20, 2026. The standalone executable also passed packaging checks without Python on PATH. The unchanged signer previously passed 4 upstream vector tests. Commands, hardware results and remaining gaps are in [docs/testing.md](docs/testing.md).
 
 ## Not supported or not tested
 
 - iPod Classic: no transfer backend yet. Its image in the design is a placeholder.
 - Other iPhones: currently rejected by the device-model check. Other iOS versions have not been validated.
 - Simultaneous uploads to multiple devices.
-- DRM files, streaming catalogue downloads, playlist editing or general library management.
+- DRM files and streaming catalogue downloads; editing smart, system or cloud playlists.
 - Clean Windows installations, Windows 10, macOS and Linux have not been tested.
 - Not every input format or possible tag combination has been tested on hardware.
 
 This is a personal prototype. Initial device setup is manual.
 
-## Library management (in development)
+## Library management
 
-The next interface has a [library backend in development](docs/library-api.md): album browsing, track/album deletion, artwork replacement, genre and release year. This source branch includes the backend; the downloadable 1.0.3 interface does not include these controls.
+The [native library backend](docs/library-api.md) supports both tested devices. Playlist creation, adding without duplicates, renaming, removing members, clearing and deletion passed hardware checks over USB. Create, add and delete also passed over Wi-Fi. Song records and unrelated playlists were compared before/after. The interface has automated interaction checks; visual review is left to the user.
+
+Compilation regrouping was verified on the iPhone. Missing-cover lookup was checked against the live artwork service; importing a new track with that artwork has not been separately tested on hardware.
 
 ## Device setup
 

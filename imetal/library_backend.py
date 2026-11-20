@@ -79,6 +79,21 @@ class LibraryService:
             raise LibraryError('wrong_device', 'This snapshot belongs to another selected device.')
         if command == 'library.query':
             return query(snapshot, payload)
+        if command == 'library.browse':
+            result = summary(snapshot)
+            for kind in ('tracks', 'albums', 'artists', 'playlists'):
+                rows, offset = [], 0
+                while True:
+                    page = query(snapshot, {'kind': kind, 'offset': offset, 'limit': 500})
+                    rows.extend(page['items']);offset += len(page['items'])
+                    if offset >= page['total']:
+                        break
+                if kind == 'playlists':
+                    members = {p['id']: p['track_ids'] for p in snapshot['playlists']}
+                    rows = [r | {'members': members[r['id']]} for r in rows
+                            if not r['is_hidden'] and r['kind'] not in ('library', 'folder')]
+                result[kind] = rows
+            return result
         if command == 'library.plan':
             proposal = self.cache.save('plans', plan(snapshot, payload.get('action'), payload))
             private = {'native_payload', 'cover', 'artwork_ids', 'content_hash'}
@@ -103,7 +118,10 @@ class LibraryService:
             raise LibraryError('wrong_device', 'This change belongs to another device.')
         capability = {'delete_tracks': 'delete_tracks', 'update_metadata': 'edit_metadata',
                       'replace_artwork': 'replace_artwork'}.get(proposal['action'])
-        if not capability or not capabilities(backend, False)[capability]['enabled']:
+        from library_playlists import ACTIONS
+        if proposal['action'] in ACTIONS:
+            capability = 'manage_playlists'
+        if not capability or not snapshot['capabilities'].get(capability, {}).get('enabled'):
             raise LibraryError('writes_disabled', 'This library change has not passed device validation.')
         path = self.cache.root / 'runs' / (proposal['plan_id'] + '.json')
         path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,9 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="443" height="29" viewBox="0 0 443 29" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path id="Gloss" d="M0 19.7477C57.6074 25.4803 135.615 29 221.5 29C307.385 29 385.393 25.4803 443 19.7477V0H0V19.7477Z" fill="url(#paint0_linear_0_11)"/>
+<defs>
+<linearGradient id="paint0_linear_0_11" x1="221.5" y1="0" x2="221.5" y2="29" gradientUnits="userSpaceOnUse">
+<stop stop-color="white" stop-opacity="0.4"/>
+<stop offset="1" stop-color="white" stop-opacity="0.1"/>
+</linearGradient>
+</defs>
+</svg>

@@ -164,8 +164,8 @@ class LibraryTests(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(LibraryError):
                 plan(self.snapshot,'update_metadata',{'track_ids':['11'],'changes':change})
 
-    def test_out_of_scope_playlist_writes_are_not_exposed(self):
-        for action in ('create_playlist','delete_playlist','update_playlist'):
+    def test_unsupported_playlist_requests_are_rejected(self):
+        for action in ('delete_playlist','update_playlist'):
             with self.subTest(action=action), self.assertRaises(LibraryError):
                 plan(self.snapshot,action,{'name':'Playlist','playlist_ids':['701']})
 

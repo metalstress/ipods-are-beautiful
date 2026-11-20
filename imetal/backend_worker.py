@@ -3,11 +3,19 @@ import json
 import os
 from pathlib import Path
 import traceback
+import time
 
 
 class FileStop:
     def __init__(self,path):self.path=path
     def is_set(self):return self.path.exists()
+    def wait(self, timeout):
+        deadline = time.monotonic() + timeout
+        while not self.is_set():
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:return False
+            time.sleep(min(.05, remaining))
+        return True
 
 
 def execute(directory):

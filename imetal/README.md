@@ -1,10 +1,12 @@
 # iPods Are Beautiful & I'm No Longer Afraid to Die
 
-Windows music uploader, version 1.0.3.
+Windows music transfer and library manager, version 1.1.0.
 
 Run iPods Are Beautiful.exe. Python, Rust and build tools are not required.
 
 Drag songs or albums into the window. With auto upload enabled, transfer starts immediately; otherwise press Upload after building the queue.
+
+Open Manage library to browse albums, artists, songs and playlists on a connected device. You can delete songs or albums, edit genre and year, and replace artwork. Create, rename or delete ordinary playlists, or add selected songs from the Songs tab. Removing a song from a playlist keeps it in Music.
 
 The tested devices are a jailbroken iPod touch 4 on iOS 6.1.6 and an iPhone 16 Pro on iOS 27.0. USB and Wi-Fi are supported. Only one device can receive a transfer at a time.
 

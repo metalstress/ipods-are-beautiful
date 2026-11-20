@@ -13,7 +13,7 @@ from PySide6.QtCore import Qt, Signal, QThread, QTimer, QLockFile, QRectF, QCore
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPen, QPainterPath, QRegion, QShortcut, QKeySequence
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QVBoxLayout,
     QHBoxLayout, QComboBox, QLineEdit, QTableWidgetItem, QMessageBox, QMenu,
-    QScrollArea, QSizePolicy)
+    QScrollArea, QSizePolicy, QStackedWidget)
 
 from media import discover
 from transport import DATA, RESOURCES, settings, save_settings
@@ -22,7 +22,7 @@ from theme import apply_light_theme
 from version import VERSION
 from transfer_speed import TransferSpeed
 from ui import (APP_NAME, ASSETS, COLORS, load_fonts, font, label, layout, SilverButton,
-    TitleBar, LCD, DropZone, DeviceCard, Svg, AutoCheck, TrackTable, TableFrame, Grip, ConnectionForm, Footer)
+    TitleBar, LCD, DropZone, DeviceCard, ScanSpinner, Svg, AutoCheck, TrackTable, TableFrame, Grip, ConnectionForm, Footer)
 
 
 def human_size(size):
@@ -190,7 +190,11 @@ class Window(QMainWindow):
         self.device_layout = layout(self.device_container, spacing=8)
         self.device_layout.setAlignment(Qt.AlignTop)
         self.device_scroll.setWidget(self.device_container)
-        device_box.addWidget(self.device_scroll,1)
+        self.device_stack = QStackedWidget()
+        self.scan_spinner = ScanSpinner()
+        self.device_stack.addWidget(self.device_scroll)
+        self.device_stack.addWidget(self.scan_spinner)
+        device_box.addWidget(self.device_stack,1)
         side.addWidget(device_area,1)
         hints = QWidget()
         hints.setFixedHeight(40)
@@ -239,17 +243,24 @@ class Window(QMainWindow):
         self.upload.clicked.connect(self.start)
         controls.addWidget(self.upload)
         main.addWidget(options)
-        main_body.addWidget(content,1)
+        self.content_stack=QStackedWidget()
+        self.content_stack.addWidget(content)
+        main_body.addWidget(self.content_stack,1)
         outer.addWidget(body,1)
         footer = Footer()
         footer.setFixedHeight(26)
         footer.setObjectName('footer')
         bottom = layout(footer,False,(12,4,12,4))
         self.status = label('Ready for transfer',color='#626e76')
+        self.status.setSizePolicy(QSizePolicy.Ignored,QSizePolicy.Fixed)
         bottom.addWidget(self.status,1)
         bottom.addWidget(label(APP_NAME+' '+VERSION,color='#697b89'))
         bottom.addWidget(Grip(self))
         outer.addWidget(footer)
+        from library_ui import LibraryPanel
+        self.library=LibraryPanel(self)
+        self.content_stack.addWidget(self.library)
+        self.drop.manageRequested.connect(self.library.open_manager)
         self.upload.setEnabled(not self.auto.isChecked())
         QShortcut(QKeySequence.Delete,self.table,activated=self.remove_selected)
         QShortcut(QKeySequence('Ctrl+O'),self,activated=self.drop.choose_files)
@@ -295,6 +306,8 @@ class Window(QMainWindow):
         if self.checking or self.is_busy():
             return
         self.checking=True
+        if scan and self.scan_serial == 0 and not self.preview:
+            self.device_stack.setCurrentWidget(self.scan_spinner)
         self.scan_button.setEnabled(False)
         self.connect_button.setEnabled(False)
         self.status.setText('Scanning for devices…' if scan else 'Connecting…')
@@ -303,17 +316,25 @@ class Window(QMainWindow):
     def connection_result(self,result):
         self.scan_serial += 1
         self.checking=False
+        self.device_stack.setCurrentWidget(self.device_scroll)
         if self.quitting:
             return
         self.scan_button.setEnabled(not self.is_busy())
         self.connect_button.setEnabled(not self.is_busy())
         if result.get('devices'):
             self.devices={info['id']:info for info in result['devices']}
+            if self.library.device:
+                info=self.devices.get(self.library.device['id'])
+                if info:
+                    self.library.device=info
+                    self.library.config=dict(info.get('config') or self.library.config)
+                else:self.library.device_removed(self.library.device['id'])
             self.redraw_devices()
             self.status.setText('Connected — ready for transfer')
             if self.auto.isChecked():
                 self.start(automatic=True)
         else:
+            if self.library.device:self.library.device_removed(self.library.device['id'])
             self.devices.clear()
             self.redraw_devices()
             self.status.setText('No device found — check USB or Wi-Fi')
@@ -349,6 +370,7 @@ class Window(QMainWindow):
             self.device_layout.addWidget(card)
 
     def eject(self,device_id):
+        self.library.device_removed(device_id)
         if self.current_device==device_id and self.is_busy():
             self.worker.stop.set()
             self.status.setText('Ejecting — finishing the current operation safely…')
@@ -400,7 +422,11 @@ class Window(QMainWindow):
         self.count.setText(f'{len(self.paths)} tracks selected')
 
     def start(self,automatic=False):
-        if self.preview or self.is_busy() or self.checking:
+        if self.quitting or self.preview or self.is_busy() or self.checking:
+            return
+        if self.library.active:
+            self.library.queue=type(self.library.queue)(r for r in self.library.queue if r[0]!='cover')
+            QTimer.singleShot(250,lambda:self.start(automatic=automatic))
             return
         pending=[p for p in self.paths if self.states.get(str(p)) not in ('On iPod','Already on iPod','On iPhone','Already on iPhone')
                  and (not automatic or str(p) not in self.attempted)]
@@ -510,6 +536,8 @@ class Window(QMainWindow):
             device='iPhone' if self.current_device_kind=='iphone' else 'iPod'
             self.status.setText(f'Imported: {count} · already on {device}: {skipped} · failed: {errors}')
         if self.auto.isChecked():QTimer.singleShot(100,lambda:self.start(automatic=True))
+        if self.content_stack.currentWidget() is self.library and self.library.device:
+            self.library.reload()
 
     def remove_selected(self):
         if self.is_busy():return
@@ -561,6 +589,7 @@ def main():
     parser.add_argument('--check-devices',type=Path)
     parser.add_argument('--diagnose-startup',type=Path)
     parser.add_argument('--preview-state',choices=['ready','empty','uploading','iphone'],default='ready')
+    parser.add_argument('--preview-library',default='',help='Offscreen library state for design review')
     args=parser.parse_args()
     if args.check_devices:
         try:
@@ -627,6 +656,9 @@ def main():
         if args.preview_state=='uploading':
             window.show_progress('C418 — plastik · Uploading',{'tracks_total':12,'imported':4,
                 'bytes_transferred':1.25*1024**3,'bytes_total':3.7*1024**3,'bytes_estimated':False},.42)
+        if args.preview_library:
+            from library_preview import load_preview
+            load_preview(window,args.preview_library)
     window.show()
     if args.render:
         app.processEvents()

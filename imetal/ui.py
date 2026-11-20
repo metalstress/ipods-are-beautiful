@@ -2,7 +2,7 @@
 from pathlib import Path
 import os
 
-from PySide6.QtCore import Qt, QRectF, QPointF, Signal, QSize, QTimer
+from PySide6.QtCore import QEasingCurve, Qt, QRectF, QPointF, Signal, QSize, QTimer, QVariantAnimation
 from PySide6.QtGui import QColor, QFont, QFontDatabase, QPainter, QPainterPath, QPen, QLinearGradient, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (QWidget, QFrame, QLabel, QPushButton, QAbstractButton,
@@ -252,6 +252,7 @@ class LCD(QWidget):
 
 class DropZone(QFrame):
     paths = Signal(list)
+    manageRequested = Signal()
 
     def __init__(self):
         super().__init__()
@@ -278,7 +279,16 @@ class DropZone(QFrame):
         self.choose = SilverButton('Select from folder')
         self.choose.setFixedWidth(113)
         self.choose.clicked.connect(self.choose_folder)
-        body.addWidget(self.choose, 0, Qt.AlignHCenter)
+        buttons=QWidget()
+        actions=layout(buttons,False,spacing=8)
+        actions.addStretch()
+        actions.addWidget(self.choose)
+        self.manage=SilverButton('Manage library')
+        self.manage.setFixedWidth(113)
+        self.manage.clicked.connect(self.manageRequested)
+        actions.addWidget(self.manage)
+        actions.addStretch()
+        body.addWidget(buttons)
         outer.addWidget(group)
         outer.addStretch()
 
@@ -385,6 +395,43 @@ class EjectButton(QAbstractButton):
         if not self.isEnabled():
             p.setOpacity(.3)
         self.renderer.render(p, QRectF(self.rect()))
+
+
+class ScanSpinner(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setAccessibleName('Scanning for devices')
+        self.spin = QVariantAnimation(self)
+        self.spin.setStartValue(10.0)
+        self.spin.setEndValue(62.1)
+        self.spin.setDuration(1300)
+        self.spin.setLoopCount(-1)
+        easing = QEasingCurve(QEasingCurve.BezierSpline)
+        easing.addCubicBezierSegment(QPointF(.65, .05), QPointF(.36, 1), QPointF(1, 1))
+        self.spin.setEasingCurve(easing)
+        self.spin.valueChanged.connect(lambda _: self.update())
+
+    def showEvent(self, event):
+        self.spin.start()
+
+    def hideEvent(self, event):
+        self.spin.stop()
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.translate(self.width() / 2, self.height() / 2)
+        painter.rotate(270)
+        painter.scale(1.75, 1.75)
+        ring = QRectF(-6.75, -6.75, 13.5, 13.5)
+        painter.setPen(QPen(QColor(0, 0, 0, 38), 2.5))
+        painter.drawEllipse(ring)
+        arc = QPen(QColor(COLORS['heading']), 2.5)
+        arc.setCapStyle(Qt.RoundCap)
+        arc.setDashPattern([10 / 2.5, 42.1 / 2.5])
+        arc.setDashOffset(self.spin.currentValue() / 2.5)
+        painter.setPen(arc)
+        painter.drawEllipse(ring)
 
 
 class DeviceCard(QWidget):

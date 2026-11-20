@@ -38,9 +38,29 @@ These checks cover the backend, not the future interface or a packaged library-m
 
 ## Windows executable
 
+### 1.1.0 preview
+
+On November 5, 2026, **103 application tests passed**, including the new playlist plans, exact signed IDs, duplicate prevention, protected-playlist checks, verified capture caching and offscreen library interactions. Playlist create/add/repeated-add/rename/remove/clear/delete passed on iPod touch 4 and iPhone 16 Pro over USB; create/add/delete also passed over forced Wi-Fi on both. Tests used temporary playlists referencing existing local songs; all song records and unrelated playlists were checked unchanged, and temporary playlists were removed. No desktop UI was operated. Visual review is left to the designer.
+
+Both devices passed the actual app worker flow: open library, create a playlist, select songs, use the picker, rename, cancel staged removal, save removal and delete the playlist. Legacy checks caught NSNumber conversion losing low bits of long song IDs; membership now uses a native decimal scanner and integer buffers. SpringBoard is preferred over suspended Music for legacy framework calls. Database files are reused only when before/after device checksums match; the volatile SHM index is rebuilt locally.
+
+The pre-existing library hardware validation above covers album/song deletion, genre/year and artwork. The new interface connects those same backend operations. Clean-machine setup, Classic, other models and firmware remain untested.
+
+### Published 1.0.3
+
 The standalone 1.0.3 executable was checked on Windows 11 x64 from an empty working directory, with Python removed from PATH and fresh local settings. Empty and iPhone UI previews rendered offscreen. The frozen backend processed an empty queue without connecting to a device. Bundled FFmpeg 7.1 and the Rust signer ran successfully; the executable contains Python 3.13, blank device defaults and third-party notices. PE metadata confirms x64 and version 1.0.3.
 
 The release ZIP passed its integrity check. These checks validate packaging on the development PC; they do not replace testing on a clean Windows installation.
+
+### Compilation import and missing artwork — November 20, 2026
+
+Compilation grouping checks matching album titles plus MusicBrainz release IDs, valid GTIN barcodes or label-qualified catalogue numbers. Explicit album artists are shared within a matching release; different track artists remain intact. Conflicting IDs or explicit album artists prevent automatic grouping. Original files are not retagged. Missing artwork uses Deezer with MusicBrainz / Cover Art Archive fallback; a tagged MusicBrainz release ID is tried directly first. Lookup results live only within the import batch, and an artwork miss does not fail the audio import.
+
+The fourteen original FLAC files for The Needle Drop LP were checked against the generated native operations: one shared album identity and fourteen unchanged track artists. The existing fourteen iPhone tracks were regrouped through a signed native metadata session over USB. Their IDs, artwork, titles, artists, durations, stored paths and file sizes were preserved, and all fourteen stored files were checked. The other 349 song records and ordinary playlists were unchanged. Playback history gained a played song during the check. The compilation flag was confirmed on all fourteen tracks. No audio was deleted or uploaded again.
+
+Regression checks cover matching and conflicting release IDs, guest artists, translated compilation labels, conversion metadata, source preservation, artwork fallback and cancellation. A live missing-cover lookup returned the 250-pixel Celestial Blues artwork; that network check did not write to a device. New missing-cover imports on hardware and compilation grouping on iPod have not been separately tested.
+
+The final 1.1.0 source passed 142 application tests and 3 additional Music protocol tests. Its standalone executable passed the packaging checks above, including the frozen library catalogue and playlist-planning entry points. The signer implementation is unchanged.
 
 ```powershell
 python tools/check_release.py path/to/iPods-Are-Beautiful-Windows-x64.exe path/to/check-output

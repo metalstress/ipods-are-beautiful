@@ -42,6 +42,8 @@ def _first(tags, *keys):
             if not value:
                 continue
             value = value[0]
+        if isinstance(value, bytes):
+            return value.decode('utf-8', errors='replace')
         return str(value)
     return ""
 
@@ -66,6 +68,9 @@ class Track:
     digest: str = ""
     album_artist: str = ""
     copyright: str = ""
+    album_artist_explicit: bool = False
+    release_ids: tuple = ()
+    compilation: bool = False
 
     @property
     def key(self):
@@ -113,13 +118,38 @@ def inspect(path):
     if path.suffix.lower() in {".wav", ".aif", ".aiff"}:
         native = bits <= 24 and rate <= 48000 and channels <= 2
     fmt = "ALAC" if isinstance(audio, MP4) and "alac" in str(audio.info.codec).lower() else path.suffix[1:].upper()
+    album_artist = _first(tags, "albumartist", "album artist", "album_artist", "aART", "TPE2", "WM/AlbumArtist").strip()
+    compilation = _first(tags, "compilation", "cpil", "TCMP", "WM/IsCompilation").casefold() in ("1", "true", "yes")
+    release_ids = []
+    for kind, keys in (
+            ("musicbrainz", ("musicbrainz_albumid", "TXXX:MusicBrainz Album Id", "----:com.apple.iTunes:MusicBrainz Album Id")),
+            ("barcode", ("barcode", "upc", "ean", "TXXX:BARCODE", "----:com.apple.iTunes:BARCODE", "WM/Barcode")),
+            ("catalogue", ("catalognumber", "catalog_number", "catalog number", "TXXX:CATALOGNUMBER"))):
+        value = _first(tags, *keys).strip().casefold()
+        if kind == "musicbrainz" and value:
+            from uuid import UUID
+            try: value = str(UUID(value))
+            except ValueError: value = ""
+        elif kind == "barcode":
+            value = value.replace(" ", "").replace("-", "")
+            valid = value.isascii() and value.isdecimal() and len(value) in (8, 12, 13, 14) and int(value) != 0
+            if valid:
+                valid = (int(value[-1]) + sum(int(c) * (3 if i % 2 == 0 else 1)
+                         for i, c in enumerate(reversed(value[:-1])))) % 10 == 0
+            value = value.zfill(14) if valid else ""
+        elif kind == "catalogue":
+            label = _first(tags, "label", "publisher", "TPUB", "WM/Publisher").strip().casefold()
+            value = label + "/" + value if value and label else ""
+        if value:
+            release_ids.append((kind, value))
     return Track(path, title, artist, album, float(audio.info.length), native, fmt,
                  int(number) if number.isdigit() else 1,
                  int(total) if total.isdigit() and int(total) else 0,
                  int(year) if year.isdigit() else 0,
                  _first(tags, "genre", "\xa9gen", "TCON", "WM/Genre"),
-                 rate, bits, channels, cover, album_artist=_first(tags, "albumartist", "aART", "TPE2", "WM/AlbumArtist") or artist,
-                 copyright=_first(tags, "copyright", "\xa9cpy", "TCOP", "Copyright"))
+                 rate, bits, channels, cover, album_artist=album_artist or ("Various Artists" if compilation else artist),
+                 copyright=_first(tags, "copyright", "\xa9cpy", "TCOP", "Copyright"),
+                 album_artist_explicit=bool(album_artist), release_ids=tuple(release_ids), compilation=compilation)
 
 
 def fingerprint(track, stop):

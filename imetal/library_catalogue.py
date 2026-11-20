@@ -127,6 +127,10 @@ def read_snapshot(path, backend, device_id, native=None):
                             and identifier != '0' and pid(r.get('sync_id', 0)) == identifier
                             and r.get('is_src_remote') == 1 and not r.get('cloud_global_id')
                             and r.get('smart_criteria') is None and not any(r.get(k, 0) for k in flags))
+                if backend == 'touch':
+                    ordinary = (identifier not in ('0', pid(info['primary_container_pid']))
+                        and not r.get('smart_criteria') and not r.get('cloud_global_id')
+                        and not any(r.get(k, 0) for k in flags))
                 ids = members.get(identifier, []) if membership_known else None
                 playlists.append({'id': identifier, 'wire_id': pid(r.get('sync_id', 0)), 'name': r['name'] or '',
                                   'kind': 'library' if identifier == pid(info['primary_container_pid']) else

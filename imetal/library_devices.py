@@ -4,6 +4,9 @@ Audio export is intentionally not exposed by the product's library API.
 """
 import asyncio
 import hashlib
+import re
+import shlex
+import shutil
 from pathlib import Path
 import stat
 import uuid
@@ -33,6 +36,9 @@ def check_stop(stop):
 
 
 def _touch_capture(session, device_id, stop):
+    fast = _touch_capture_hashed(session, device_id, stop)
+    if fast is not None:
+        return fast
     directory = DATA / 'library-captures' / device_id / uuid.uuid4().hex
     directory.mkdir(parents=True)
     previous = None
@@ -77,12 +83,89 @@ def _touch_capture(session, device_id, stop):
     raise LibraryError('catalogue_changed', 'Music catalogue did not settle. Refresh after playback or sync finishes.')
 
 
+def _touch_capture_hashed(session, device_id, stop):
+    """Reuse byte-identical local files; bound the capture by two device hashes.
+
+    A playlist edit usually changes only the WAL. No unchanged multi-megabyte
+    database is downloaded again over the iPod's slow Wi-Fi connection.
+    """
+    if not hasattr(session,'run'):
+        return None
+    try:
+        available=session.run('command -v sha256sum')
+    except (RuntimeError,OSError):
+        return None
+    if not isinstance(available,str) or not available.strip():
+        return None
+    root=DATA/'library-captures'/device_id
+    root.mkdir(parents=True,exist_ok=True)
+    directory=root/uuid.uuid4().hex;directory.mkdir()
+    cache=DATA/'library-raw-cache'/device_id;cache.mkdir(parents=True,exist_ok=True)
+    previous=sorted((p for p in root.iterdir() if p.is_dir() and p!=directory),
+                    key=lambda p:p.stat().st_mtime_ns,reverse=True)[:4]
+    def identities():
+        values={}
+        # SHM is a volatile reader index; SQLite rebuilds it locally from WAL.
+        for suffix in ('','-wal'):
+            try:s=session.sftp.lstat(TOUCH_LIBRARY+suffix)
+            except FileNotFoundError:
+                if suffix:continue
+                raise LibraryError('missing_catalogue','The device Music catalogue is missing.')
+            if not stat.S_ISREG(s.st_mode) or not 0<=s.st_size<=MAX_CAPTURE:
+                raise LibraryError('invalid_catalogue','Unexpected catalogue file type or size.')
+            values[suffix]=(s.st_size,s.st_mtime,s.st_mode)
+        return values
+    def hashes(values):
+        output=session.run('sha256sum '+' '.join(shlex.quote(TOUCH_LIBRARY+s) for s in values),timeout=30)
+        result={}
+        for line in output.splitlines():
+            digest,_,name=line.partition(' ');name=name.strip().lstrip('*')
+            if re.fullmatch('[0-9a-f]{64}',digest) and name.startswith(TOUCH_LIBRARY):
+                result[name[len(TOUCH_LIBRARY):]]=digest
+        if set(result)!=set(values):
+            raise LibraryError('catalogue_changed','Music catalogue changed while hashing.')
+        return result
+    for attempt in range(4):
+        check_stop(stop);before=identities();start=hashes(before)
+        for suffix,identity in before.items():
+            name='MediaLibrary.sqlitedb'+suffix;target=directory/name
+            cached=cache/(start[suffix]+suffix)
+            if not cached.exists():
+                candidate=next((p/name for p in previous if (p/name).is_file()
+                    and (p/name).stat().st_size==identity[0]
+                    and hashlib.sha256((p/name).read_bytes()).hexdigest()==start[suffix]),None)
+                if candidate:shutil.copyfile(candidate,cached)
+            if cached.exists() and hashlib.sha256(cached.read_bytes()).hexdigest()==start[suffix]:
+                shutil.copyfile(cached,target)
+            else:
+                digest=hashlib.sha256();count=0
+                with session.sftp.open(TOUCH_LIBRARY+suffix,'rb') as source,target.open('wb') as output:
+                    while chunk:=source.read(CHUNK):
+                        check_stop(stop);count+=len(chunk)
+                        if count>identity[0]:raise LibraryError('catalogue_changed','Music catalogue grew during capture.')
+                        output.write(chunk);digest.update(chunk)
+                if count!=identity[0] or digest.hexdigest()!=start[suffix]:
+                    raise LibraryError('catalogue_changed','Music catalogue changed during capture.')
+                shutil.copyfile(target,cached)
+        for suffix in ('','-wal','-shm'):
+            if suffix not in before:(directory/('MediaLibrary.sqlitedb'+suffix)).unlink(missing_ok=True)
+        after=identities()
+        if before==after and start==hashes(after):
+            return directory/'MediaLibrary.sqlitedb'
+    raise LibraryError('catalogue_changed','Music catalogue did not settle. Refresh after playback or sync finishes.')
+
+
 def _read_touch(config, device_id, stop):
     from transport import Session
     with Session(config) as session:
         session.sftp.get_channel().settimeout(30)
-        path = _touch_capture(session, device_id, stop)
-        return read_snapshot(path, 'touch', device_id)
+        return touch_snapshot(session, device_id, stop)
+
+
+def touch_snapshot(session, device_id, stop):
+    from library_touch_playlists import read
+    record = read_snapshot(_touch_capture(session, device_id, stop), 'touch', device_id)
+    return read(session, record)
 
 
 async def _modern(config, device_id):

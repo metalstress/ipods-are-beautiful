@@ -1,6 +1,6 @@
 """One version for the window footer and Windows executable metadata."""
 APP_NAME = "iPods Are Beautiful & I'm No Longer Afraid to Die"
-VERSION = "1.0.3"
+VERSION = "1.1.0"
 
 
 def windows_resource():

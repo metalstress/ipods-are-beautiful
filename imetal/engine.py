@@ -14,6 +14,7 @@ import time
 import uuid
 
 from media import Cancelled, convert, fingerprint, inspect
+from album_metadata import album_artist_overrides, complete_artwork, is_various_artists
 from transport import DATA, RESOURCES, Session
 
 REMOTE = "/var/mobile/Media/iMetal"
@@ -299,6 +300,11 @@ class Engine:
             return {"tracks_total": total, "imported": imported, "skipped": skipped, "errors": errors,
                     "bytes_transferred": uploaded_bytes + current_uploaded[0],
                     "bytes_total": sum(sizes.values()), "bytes_estimated": bool(estimated)}
+        try:
+            album_artists = album_artist_overrides(paths, self.stop)
+        except Cancelled:
+            return {"cancelled": True, **counters()}
+        artwork = {}
         with Session(self.config) as session:
             self.emit({"type": "connection", **session.info()})
             self.emit({"stage": "Подготавливаем iPod", "overall": 0, "detail": "Проверяем подключение и компонент импорта…", **counters()})
@@ -329,6 +335,8 @@ class Engine:
                     try:
                         event(0, "Читаем информацию", "Подготовка")
                         track = inspect(path)
+                        track.album_artist = album_artists.get(str(path), track.album_artist)
+                        track.compilation = track.compilation or is_various_artists(track.album_artist)
                         if track.native:
                             estimated.discard(str(path))
                         else:
@@ -350,6 +358,9 @@ class Engine:
                                and abs(r["duration"] - track.duration) <= 2 for r in entries):
                             raise RuntimeError("На iPod осталась незавершённая загрузка этого трека.")
                         fingerprint(track, self.stop)
+                        if not track.cover:
+                            event(.05, "Finding album artwork", "Подготовка")
+                            complete_artwork(track, artwork, self.stop)
                         local = convert(track, self.stop, lambda value: event(.06 + .29 * value, "Конвертация в ALAC", "Конвертация"))
                         sizes[str(path)] = local.stat().st_size
                         estimated.discard(str(path))

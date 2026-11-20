@@ -4,8 +4,9 @@ from pathlib import Path
 import threading
 
 from media import Cancelled, inspect
+from album_metadata import album_artist_overrides, complete_artwork, is_various_artists
 from modern_devices import pair_record,remember_capacity
-from modern_music import ModernDevice, prepare_audio, native_format
+from modern_music import ModernDevice, prepare_audio, native_format, jpeg_artwork
 from transport import DATA
 from datetime import datetime
 
@@ -26,7 +27,12 @@ class ModernEngine:
             return {'tracks_total': 0, 'imported': 0, 'skipped': 0, 'errors': 0,
                     'bytes_transferred': 0, 'bytes_total': 0, 'bytes_estimated': False}
         root = Path(self.config['backup_root'])
-        sizes = {str(p): p.stat().st_size for p in paths}
+        sizes = {}
+        for path in paths:
+            try:
+                sizes[str(path)] = path.stat().st_size
+            except OSError:
+                sizes[str(path)] = 0
         estimated = set(sizes)
         imported = skipped = errors = transferred = 0
         current = 0
@@ -37,6 +43,12 @@ class ModernEngine:
                     'errors': errors, 'bytes_transferred': transferred + current,
                     'bytes_total': sum(sizes.values()), 'bytes_estimated': bool(estimated)}
 
+        self.emit({'stage': 'Reading album metadata', 'overall': 0, **counters()})
+        try:
+            album_artists = await asyncio.to_thread(album_artist_overrides, paths, self.stop)
+        except Cancelled:
+            return {**counters(), 'cancelled': True}
+        artwork = {}
         for index, path in enumerate(paths):
             if self.stop.is_set():
                 return {**counters(), 'cancelled': True}
@@ -64,6 +76,12 @@ class ModernEngine:
                       'Preparing' if native else 'Converting')
                 ready = await asyncio.to_thread(prepare_audio, path, root / 'conversion-cache', self.stop,
                                                lambda value: event(.02 + .26 * value, 'Converting to ALAC', 'Converting'))
+                # Conversion caches contain source tags; batch grouping is applied
+                # to the native operation, without changing the source file.
+                ready.album_artist = album_artists.get(str(path), getattr(track, 'album_artist', ''))
+                ready.release_ids = getattr(track, 'release_ids', ())
+                ready.compilation = getattr(track, 'compilation', False) or is_various_artists(ready.album_artist)
+                ready.cover = getattr(ready, 'cover', b'') or getattr(track, 'cover', b'')
                 format_label = track.format if ready.path == path else track.format + ' → ' + ready.format
                 sizes[str(path)] = ready.path.stat().st_size
                 estimated.discard(str(path))
@@ -89,14 +107,18 @@ class ModernEngine:
                         continue
                     if self.stop.is_set():
                         raise Cancelled()
+                    if not getattr(ready, 'cover', b''):
+                        event(.32, 'Finding album artwork', 'Preparing')
+                        await asyncio.to_thread(complete_artwork, ready, artwork, self.stop)
+                    jpeg_artwork(ready)
                     capacity = await device.afc.get_device_info()
                     remember_capacity(self.config['udid'],int(capacity['FSFreeBytes']),int(capacity['FSTotalBytes']))
                     if int(capacity['FSFreeBytes']) < sizes[str(path)] + 16 * 1024**2:
                         raise RuntimeError('Not enough free space on iPhone.')
                     event(.35, 'Uploading', 'Uploading')
                     # Finish a submitted native operation before honoring Eject.
-                    # An interrupted/ambiguous native session stops the batch;
-                    # it is never automatically repeated.
+                    # Each subsequent track opens a fresh connection and reads
+                    # the catalogue again, including any unfinished sync entries.
                     await asyncio.wait_for(device.push_alac(ready), 600)
                     capacity = await device.afc.get_device_info()
                     remember_capacity(self.config['udid'],int(capacity['FSFreeBytes']),int(capacity['FSTotalBytes']))
@@ -111,13 +133,19 @@ class ModernEngine:
                 return {**counters(), 'cancelled': True}
             except Exception as error:
                 errors += 1
+                transferred += current
+                sizes[str(path)] = current
+                estimated.discard(str(path))
+                current = 0
                 detail=('iPhone is not responding. Unlock it and check USB or Wi-Fi.'
                         if isinstance(error,TimeoutError) else str(error) or type(error).__name__)
                 event(1, 'Import failed', 'Failed', detail)
-                DATA.mkdir(parents=True,exist_ok=True)
-                with (DATA/'errors.log').open('a',encoding='utf-8') as log:
-                    log.write(f'{datetime.now().isoformat()} {path.name}: {detail}\n')
-                # The phone may have committed metadata before a link failure.
-                # Do not start further sync sessions on that uncertain state.
-                return {**counters(), 'interrupted': True}
+                try:
+                    DATA.mkdir(parents=True,exist_ok=True)
+                    with (DATA/'errors.log').open('a',encoding='utf-8') as log:
+                        log.write(f'{datetime.now().isoformat()} {path.name}: {detail}\n')
+                except OSError:
+                    pass
+                # Leave this track marked Failed. The next track checks a fresh
+                # library and staging state through its own native session.
         return {**counters(), 'cancelled': self.stop.is_set()}

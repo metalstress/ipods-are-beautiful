@@ -17,6 +17,9 @@ def assert_fresh(expected, actual):
 def plan(snapshot, action, params):
     if not isinstance(params, dict):
         raise LibraryError('invalid_request', 'Mutation parameters must be an object.')
+    from library_playlists import ACTIONS, playlist_plan
+    if action in ACTIONS:
+        return playlist_plan(snapshot, action, params)
     if action not in ('delete_tracks', 'update_metadata', 'replace_artwork'):
         raise LibraryError('unsupported_operation', 'This library change is not implemented.')
     ids = params.get('track_ids', [])

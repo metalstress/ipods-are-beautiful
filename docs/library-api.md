@@ -1,6 +1,6 @@
 # Library backend
 
-Source-only foundation for the next interface. It does not add controls or change the installed 1.0.3 release.
+Backend used by the 1.1.0 library interface.
 
 ## Scope
 
@@ -9,7 +9,7 @@ Source-only foundation for the next interface. It does not add controls or chang
 - Replace artwork without uploading the audio again.
 - Set genre and release year for tracks or albums.
 
-Audio export, playback, playlist editing, album/artist renaming and full release dates are outside this feature. Internal file-copy helpers are retained for hardware-test backups; there is no public export command.
+Audio export, playback, album/artist renaming and full release dates are outside this feature. Internal file-copy helpers are retained for hardware-test backups; there is no public export command.
 
 The tested targets remain jailbroken iPod touch 4 / iOS 6.1.6 and paired iPhone 16 Pro / iOS 27.0. Cloud-only, protected or unfinished entries can be shown but cannot be edited by this backend. Other models/firmware are not validated.
 
@@ -30,6 +30,8 @@ tracks = run_backend('library.query', config, payload={
 ```
 
 `library.read` returns `snapshot_id`, `revision`, device/backend identity, capture time, capabilities and counts (albums, artists, tracks, local tracks, bytes and duration). A snapshot describes one device and one library revision. Queries use the cached snapshot and do not reconnect.
+
+`library.browse` takes `snapshot_id` and returns the complete public catalogue for navigation: tracks, albums, artists and visible playlists. Playlists include ordered public `members` IDs. Native wire IDs, device file paths and protected sync payloads stay in the backend. Legacy membership is read with MediaPlayer on the device; no SQL is written.
 
 Album rows include `id`, `title`, `album_artist`, `track_count`, `local_count`, `size_bytes`, `duration_ms`, `genre`, `year`, `metadata_mixed`, `has_artwork` and `artwork_track_id`. A mixed genre/year is `null`, with the corresponding `metadata_mixed` flag set; an unknown year is `0`.
 
@@ -69,6 +71,14 @@ Actions:
 | `delete_tracks` | `track_ids` and/or `album_ids` |
 | `update_metadata` | Selection plus `changes`: nonempty `genre`, integer `year` from 0 to 9999; 0 clears the year |
 | `replace_artwork` | Selection plus absolute local `cover_path` |
+| `create_playlist` | Nonempty `name`; optional `track_ids` |
+| `rename_playlist` | `playlist_id`, `name` |
+| `delete_playlist` | `playlist_id`; keeps songs in Music |
+| `add_to_playlist` | `playlist_id`, `track_ids`; existing members are not added twice |
+| `remove_from_playlist` | `playlist_id`, `track_ids`; keeps songs in Music |
+| `set_playlist_tracks` | `playlist_id`, complete ordered `track_ids`; `[]` clears the playlist |
+
+Playlist operations are limited to ordinary editable playlists with known membership. Existing occurrences and order are preserved when adding; repeated additions are no-ops after a fresh catalogue check. The iPhone adapter sends signed native playlist operations. The touch adapter uses MediaPlayer and MediaLibrary with native integer buffers. Every successful change verifies the requested name/membership and checks unrelated songs and playlists.
 
 An album selection expands to all of its tracks. A mixed selection containing cloud, unfinished or unidentified tracks is refused as a whole. A session is limited to 499 tracks; larger changes must be prepared separately against each returned fresh snapshot.
 
@@ -98,4 +108,4 @@ The iPhone receiver may reset **recent** play/skip counters during a metadata se
 
 Hardware tests use disposable generated albums on iPhone and backed-up Lil Peep material on iPod. Test fixtures are removed afterwards; unrelated music is compared before/after. Detailed results are summarized in [testing.md](testing.md).
 
-The interface, integration into a packaged release, other devices/firmware and large-library stress behaviour are not finished or claimed by this foundation.
+Other devices/firmware and large-library stress behaviour are not validated. Interface visual review is pending.

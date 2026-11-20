@@ -54,6 +54,8 @@ def capabilities(backend, membership_known):
         'delete_tracks': {'enabled': True, 'planning': True, 'validation': 'hardware_usb_wifi'},
         'edit_metadata': {'enabled': True, 'fields': ['genre', 'year'], 'validation': 'hardware', 'date_precision': 'year'},
         'replace_artwork': {'enabled': True, 'validation': 'hardware'},
+        'manage_playlists': {'enabled': membership_known, 'validation': 'native_verified',
+                             'reason': None if membership_known else 'membership_unavailable'},
     }
 
 
@@ -105,7 +107,8 @@ def groups(tracks, kind):
         row['duration_ms'] += t['duration_ms']
         row['has_artwork'] |= t['has_artwork']
         row['_years'].add(t['year']);row['_genres'].add(t['genre'])
-        if t['has_artwork'] and row['artwork_track_id'] is None:
+        readable_cover = t['origin'] == 'device' or t.get('artwork_id') not in ('', '0', None)
+        if t['has_artwork'] and readable_cover and row['artwork_track_id'] is None:
             row['artwork_track_id'] = t['id']
     for row in result.values():
         years, genres = row.pop('_years'), row.pop('_genres')

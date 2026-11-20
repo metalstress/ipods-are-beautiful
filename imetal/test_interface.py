@@ -139,5 +139,18 @@ class InterfaceTests(unittest.TestCase):
         self.assertEqual(list(self.window.devices),['phone'])
         self.assertEqual(self.window.devices['phone']['mode'],'Wi-Fi')
 
+    def test_spinner_is_only_shown_during_the_first_scan(self):
+        spinner = self.window.scan_spinner
+        self.window.scan()
+        self.assertIs(self.window.device_stack.currentWidget(), spinner)
+        self.assertTrue(spinner.isVisible())
+        start = spinner.spin.currentValue()
+        spinner.spin.setCurrentTime(400)
+        self.assertNotEqual(spinner.spin.currentValue(), start)
+        self.window.connection_result({'devices': []})
+        self.assertIs(self.window.device_stack.currentWidget(), self.window.device_scroll)
+        self.window.scan()
+        self.assertFalse(spinner.isVisible())
+
 
 if __name__=='__main__':unittest.main()

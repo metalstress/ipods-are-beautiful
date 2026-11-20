@@ -35,6 +35,10 @@ SIGNATURE = OPERATION + '.cig'
 MAX_FRAME = 16 * 1024 * 1024
 
 
+class DeviceFileChangedError(RuntimeError):
+    pass
+
+
 def native_sign(command, data=None):
     if not SIGNER.is_file():
         raise RuntimeError('The Music signing component is missing. Reinstall this build.')
@@ -87,8 +91,12 @@ def read_catalogue(path):
         groups=[dict(r) for r in db.execute('''select a.album,a.sync_id,
             b.album_artist,b.sync_id artist_sync_id from album a
             left join album_artist b using(album_artist_pid) where a.sync_id<>0''')]
-        artwork_ids={int(r[0]) for r in db.execute("select artwork_token from artwork where artwork_source_type=300")}
-        artwork_ids.update(int(r[0]) for r in db.execute("select artwork_token from artwork_token where artwork_source_type=300"))
+        # Apple stores both numeric sync cache IDs and opaque content hashes
+        # in artwork_token. Only decimal IDs belong to the sync ID namespace.
+        tokens = db.execute("""select artwork_token from artwork where artwork_source_type=300
+                               union select artwork_token from artwork_token where artwork_source_type=300""")
+        artwork_ids = {int(token) for (value,) in tokens if (token := str(value)).isascii()
+                       and token.isdecimal() and len(token) <= 10 and int(token) < 2**32}
         return {**info, 'anchor':anchor, 'schema':schema, 'tracks':tracks, 'groups':groups,
                 'artwork_ids':artwork_ids,
                 'occupied':occupied, 'synced':synced, 'local':local}
@@ -207,6 +215,7 @@ def insert_operation(catalog, track, cleared=()):
         'sort_name':track.title,'sort_artist':track.artist,'sort_album':track.album,'sort_album_artist':artist,
         'album_pid':album_pid,'artist_pid':artist_pid,'total_time_ms':samples*1000//track.rate,
         'track_number':track.number,'disc_number':1,'is_song':True,'remember_bookmark':False,'artwork_checksum':0}
+    if getattr(track,'compilation',False):item['is_compilation']=True
     for k,v in [('genre',track.genre),('copyright',track.copyright),('year',track.year),('track_count',track.total)]:
         if v:item[k]=v
     cover=track.cover
@@ -312,23 +321,44 @@ class ModernDevice:
         finally:
             await self.afc.fclose(handle)
         if len(data)!=size or await self.afc.stat(path)!=before:
-            raise RuntimeError('Device file changed during read')
+            raise DeviceFileChangedError('Device file changed during read')
         return data
 
     async def snapshot(self,label):
         directory = self.root / (datetime.now().strftime('%Y-%m-%d_%H-%M-%S')+'-'+label+'-'+secrets.token_hex(3))
         directory.mkdir(parents=True)
-        names=['MediaLibrary.sqlitedb','MediaLibrary.sqlitedb-wal','MediaLibrary.sqlitedb-shm','iTunesPrefs.plist']
-        for attempt in range(3):
-            existing=[n for n in names if await self.exists(MUSIC_DIR+'/'+n)]
-            before={n:await self.afc.stat(MUSIC_DIR+'/'+n) for n in existing}
-            for name in existing:
-                (directory/name).write_bytes(await self.read_file(MUSIC_DIR+'/'+name))
-            after={n:await self.afc.stat(MUSIC_DIR+'/'+n) for n in existing}
-            if before==after:
+        # SHM is a transient index and locking area. SQLite reconstructs it
+        # locally from the database and WAL, so remote reader activity must
+        # not invalidate an otherwise consistent capture.
+        names = ['MediaLibrary.sqlitedb', 'MediaLibrary.sqlitedb-wal', 'iTunesPrefs.plist']
+
+        async def file_states():
+            states = {}
+            for name in names:
+                try:
+                    states[name] = await self.afc.stat(MUSIC_DIR + '/' + name)
+                except AfcFileNotFoundError:
+                    if name != 'MediaLibrary.sqlitedb-wal':
+                        raise
+            return states
+
+        for attempt in range(8):
+            # A WAL can vanish after a checkpoint. Never reuse a sidecar
+            # from a previous attempt with a newer database copy.
+            for name in [*names, 'MediaLibrary.sqlitedb-shm']:
+                (directory / name).unlink(missing_ok=True)
+            try:
+                before = await file_states()
+                for name in before:
+                    (directory / name).write_bytes(await self.read_file(MUSIC_DIR + '/' + name))
+                if before != await file_states():
+                    raise DeviceFileChangedError('Music catalogue changed during capture')
                 break
-        else:
-            raise RuntimeError('Music catalogue kept changing during capture')
+            except (DeviceFileChangedError, AfcFileNotFoundError) as error:
+                if attempt == 7:
+                    raise RuntimeError('Music is updating its library. Wait a moment and try again.') from error
+                self.emit({'stage': 'Waiting for Music library'})
+                await asyncio.sleep(min(.2 * 2**attempt, 1.6))
         self.identity = library_identity((directory/'iTunesPrefs.plist').read_bytes())
         self.catalogue = read_catalogue(directory/'MediaLibrary.sqlitedb')
         self.backup = directory

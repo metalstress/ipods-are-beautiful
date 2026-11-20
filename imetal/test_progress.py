@@ -59,6 +59,7 @@ class ProgressTests(unittest.TestCase):
         self.b=self.root/'b.mp3';self.b.write_bytes(b'b'*20)
         self.events=[]
         self.patches=[patch('engine.Session',FakeSession),patch('engine.Bridge',FakeBridge),
+            patch('engine.album_artist_overrides',return_value={}),patch('engine.complete_artwork'),
             patch('engine.DATA',self.root),patch('engine.inspect',lambda p:Track(p,p.stem,'Artist','Album',1,True,'MP3')),
             patch('engine.fingerprint',lambda t,s:setattr(t,'digest',t.path.stem)),
             patch('engine.convert',lambda t,s,p:t.path),patch('engine.time.sleep'),patch.object(Engine,'history')]

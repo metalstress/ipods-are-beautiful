@@ -68,10 +68,19 @@ class CoreTests(unittest.TestCase):
             audio["artist"] = "Исполнитель"
             audio["album"] = "Альбом"
             audio["tracknumber"] = "2/3"
+            audio["albumartist"] = "Разные исполнители"
+            audio["barcode"] = "194491369125"
+            audio["musicbrainz_albumid"] = "12345678-1234-1234-1234-123456789abc"
+            audio["publisher"] = "Label"
+            audio["catalognumber"] = "LP-01"
             audio.save()
             original = hashlib.sha256(flac.read_bytes()).hexdigest()
             track = inspect(flac)
             self.assertEqual((track.title, track.number, track.total), ('Песня "один"', 2, 3))
+            self.assertTrue(track.album_artist_explicit)
+            self.assertEqual(track.album_artist, "Разные исполнители")
+            self.assertEqual(track.release_ids, (("musicbrainz", "12345678-1234-1234-1234-123456789abc"),
+                                               ("barcode", "00194491369125"), ("catalogue", "label/lp-01")))
             stop = threading.Event()
             fingerprint(track, stop)
             target = convert(track, stop, lambda p: None)
@@ -87,6 +96,7 @@ class CoreTests(unittest.TestCase):
                 self.assertEqual(ready.format, "ALAC")
                 self.assertEqual((ready.title, ready.artist, ready.album),
                                  (track.title, track.artist, track.album))
+                self.assertEqual(ready.album_artist, track.album_artist)
             finally:
                 target.unlink(missing_ok=True)
 

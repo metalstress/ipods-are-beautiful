@@ -12,9 +12,11 @@ def bridge_for(session):
         raise LibraryError('unsupported_device', 'Library writes require the tested iPod iOS 6.1.6 backend.')
     lines = session.run('ps ax').splitlines()
     # Attaching does not reset StoreServices queues or restart an app.
-    process = next((line.split()[0] for line in lines if '/Applications/Music~iphone.app/Music~iphone' in line), None)
-    process = process or next((line.split()[0] for line in lines
+    # Music can remain in the process list while suspended by Auto-Lock.
+    # SpringBoard stays available; no app launch, unlock or restart is needed.
+    process = next((line.split()[0] for line in lines
         if '/System/Library/CoreServices/SpringBoard.app/SpringBoard' in line), None)
+    process = process or next((line.split()[0] for line in lines if '/Applications/Music~iphone.app/Music~iphone' in line), None)
     if not process:
         raise LibraryError('device_unavailable', 'The iPod media process is unavailable.')
     bridge = Bridge(session)
@@ -137,14 +139,14 @@ if(!updated) throw new Error("iPod rejected genre update");
 
 
 def artwork(session, track):
-    remote = REMOTE + '/library-preview-' + uuid.uuid4().hex + '.png'
+    remote = REMOTE + '/library-preview-' + uuid.uuid4().hex + '.jpg'
     script = selection_script([track]) + '''
 var item=[libraryItems objectAtIndex:0];
 var art=[item valueForProperty:@"artwork"];
 var size=new CGSize;
-size->width=600;size->height=600;
+size->width=250;size->height=250;
 var image=art ? [art imageWithSize:*size] : nil;
-var data=image ? UIImagePNGRepresentation(image) : nil;
+var data=image ? UIImageJPEGRepresentation(image,0.84) : nil;
 var saved=data ? [data writeToFile:''' + objc(remote) + ''' atomically:YES] : NO;
 var imetalResult=@{@"saved":[NSNumber numberWithBool:saved]};
 '''

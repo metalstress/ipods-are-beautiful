@@ -7,7 +7,7 @@ import time
 
 from library_artwork import cover_bytes
 from library_catalogue import read_snapshot
-from library_devices import _check_model, _modern, _touch_capture, check_stop, device_identity
+from library_devices import _check_model, _modern, _touch_capture, check_stop, device_identity, touch_snapshot
 from library_model import LibraryError, selected
 from library_plans import assert_fresh
 from transport import DATA
@@ -43,7 +43,7 @@ def _touch(config, snapshot, proposal, emit, stop, cover):
     from transport import Session
     with Session(config) as session:
         session.sftp.get_channel().settimeout(30)
-        fresh = read_snapshot(_touch_capture(session, snapshot['device_id'], stop), 'touch', snapshot['device_id'])
+        fresh = touch_snapshot(session, snapshot['device_id'], stop)
         assert_fresh(snapshot, fresh)
         tracks = selected(fresh, proposal['track_ids'])
         check_stop(stop)
@@ -55,7 +55,7 @@ def _touch(config, snapshot, proposal, emit, stop, cover):
         # A partially submitted native operation is never retried automatically.
         apply(session, tracks, proposal, cover, fresh['native'].get('genres'))
         for attempt in range(4):
-            after = read_snapshot(_touch_capture(session, snapshot['device_id'], None), 'touch', snapshot['device_id'])
+            after = touch_snapshot(session, snapshot['device_id'], None)
             try:
                 verify_change(fresh, after, proposal)
                 break
@@ -70,6 +70,9 @@ def _touch(config, snapshot, proposal, emit, stop, cover):
 
 
 async def apply_device(config, snapshot, proposal, emit=lambda e: None, stop=None):
+    from library_playlists import ACTIONS, apply_playlist
+    if proposal['action'] in ACTIONS:
+        return await apply_playlist(config, snapshot, proposal, emit, stop)
     backend, identity = device_identity(config)
     if any(proposal[k] != snapshot[k] for k in ('device_id', 'library_id', 'snapshot_id', 'revision')):
         raise LibraryError('invalid_plan', 'The operation does not match its library snapshot.')

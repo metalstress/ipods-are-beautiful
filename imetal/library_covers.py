@@ -12,6 +12,13 @@ from library_model import LibraryError, selected
 from transport import DATA
 
 
+def artwork_path(device_id, revision, track_id, backend):
+    key = hashlib.sha256((device_id + revision + track_id).encode()).hexdigest()
+    root = DATA / 'library-artwork'
+    legacy = root / (key + '.png')
+    return legacy if backend == 'touch' and legacy.is_file() else root / (key + '.jpg')
+
+
 def original_path(database, token):
     with closing(sqlite3.connect(database.resolve().as_uri() + '?mode=ro', uri=True)) as db:
         row = db.execute('select relative_path from artwork where artwork_token=? and artwork_source_type=300 limit 1', (token,)).fetchone()
@@ -31,11 +38,9 @@ async def read_cover(config, snapshot, identifier, stop=None):
     check_stop(stop)
     if not track['has_artwork']:
         return {'path': None}
-    key = hashlib.sha256((identity + snapshot['revision'] + track['id']).encode()).hexdigest()
-    root = DATA / 'library-artwork'
-    root.mkdir(parents=True, exist_ok=True)
-    path = root / (key + ('.png' if backend == 'touch' else '.jpg'))
+    path = artwork_path(identity, snapshot['revision'], track['id'], backend)
     if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
         if backend == 'touch':
             from library_touch import artwork
             from transport import Session
