@@ -6,6 +6,11 @@ import shutil
 import subprocess
 import sys
 
+if sys.platform == 'darwin':
+    from build_macos import main
+    main()
+    raise SystemExit(0)
+
 ROOT = Path(__file__).resolve().parent
 WORKSPACE = ROOT.parent
 NAME = "iPods Are Beautiful"

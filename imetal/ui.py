@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (QWidget, QFrame, QLabel, QPushButton, QAbstractBu
     QHeaderView, QAbstractItemView, QScrollBar)
 
 from transport import RESOURCES
+from host_platform import font_directories
 from painting import inner_shadow,RoundedClip
 from version import APP_NAME
 
@@ -27,13 +28,12 @@ def font(size=10, bold=False, family='Tahoma'):
 
 
 def load_fonts():
-    folders = [Path(os.environ.get('WINDIR', r'C:\Windows')) / 'Fonts',
-               Path(os.environ.get('LOCALAPPDATA', Path.home()/'AppData/Local')) / 'Microsoft/Windows/Fonts']
-    for folder in folders:
-        for name in ['tahoma.ttf', 'tahomabd.ttf', 'seguisym.ttf',
-                     'HelveticaNeueBold.otf', 'HelveticaNeueMedium.otf', 'HelveticaNeueRoman.otf']:
-            if (folder / name).exists():
-                QFontDatabase.addApplicationFont(str(folder / name))
+    names = ['tahoma.ttf', 'tahomabd.ttf', 'seguisym.ttf',
+             'HelveticaNeueBold.otf', 'HelveticaNeueMedium.otf', 'HelveticaNeueRoman.otf', 'Tahoma Bold.ttf']
+    for folder in font_directories():
+        for name in names:
+            if (folder/name).exists():
+                QFontDatabase.addApplicationFont(str(folder/name))
 
 
 def label(value, size=10, color=None, bold=False, height=12, parent=None):

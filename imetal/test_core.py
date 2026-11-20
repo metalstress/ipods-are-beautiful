@@ -12,6 +12,7 @@ from mutagen.flac import FLAC
 from engine import Bridge, objc
 from media import Track, Cancelled, discover, inspect, fingerprint, convert, ffmpeg
 from transport import DATA
+from host_platform import process_flags
 
 
 class CoreTests(unittest.TestCase):
@@ -62,7 +63,7 @@ class CoreTests(unittest.TestCase):
                 out.writeframes(b"".join(struct.pack("<hh", i % 20000, -(i % 20000)) for i in range(4410)))
             flac = folder / "source.flac"
             subprocess.run([ffmpeg(), "-v", "error", "-i", str(wav), str(flac)],
-                           check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+                           check=True, creationflags=process_flags())
             audio = FLAC(flac)
             audio["title"] = 'Песня "один"'
             audio["artist"] = "Исполнитель"
@@ -87,7 +88,7 @@ class CoreTests(unittest.TestCase):
             def pcm(path):
                 return subprocess.check_output([ffmpeg(), "-v", "error", "-i", str(path),
                     "-map", "0:a:0", "-c:a", "pcm_s16le", "-f", "md5", "-"],
-                    creationflags=subprocess.CREATE_NO_WINDOW)
+                    creationflags=process_flags())
             try:
                 self.assertEqual(pcm(flac), pcm(target))
                 self.assertEqual(hashlib.sha256(flac.read_bytes()).hexdigest(), original)

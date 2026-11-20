@@ -45,13 +45,18 @@ class Bridge:
                 raise RuntimeError("На iPod не установлен компонент iMetal.")
             self.session.run("dpkg --install " + " ".join(map(shlex.quote, paths)), timeout=90)
         sqlite_helper = RESOURCES / "imetal-sqlite"
+        if sqlite_helper.is_file():
+            helper_bytes = sqlite_helper.read_bytes()
+        else:
+            import gzip
+            helper_bytes = gzip.decompress((RESOURCES / 'imetal-sqlite.gz').read_bytes())
         try:
             installed = self.session.read("/usr/local/libexec/imetal-sqlite")
         except FileNotFoundError:
             installed = b""
-        if hashlib.sha256(installed).digest() != hashlib.sha256(sqlite_helper.read_bytes()).digest():
+        if hashlib.sha256(installed).digest() != hashlib.sha256(helper_bytes).digest():
             self.session.mkdir("/usr/local/libexec")
-            self.session.sftp.put(str(sqlite_helper), "/usr/local/libexec/imetal-sqlite")
+            self.session.write("/usr/local/libexec/imetal-sqlite", helper_bytes)
             self.session.sftp.chmod("/usr/local/libexec/imetal-sqlite", 0o755)
         self.session.mkdir(REMOTE + "/Incoming")
         self.session.run("chown mobile:mobile " + shlex.quote(REMOTE) + " " + shlex.quote(REMOTE + "/Incoming"))

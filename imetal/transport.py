@@ -12,8 +12,9 @@ import time
 
 import paramiko
 from paramiko.hostkeys import HostKeyEntry
+from host_platform import data_directory, usbmux_connection
 
-DATA = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local")) / "iMetal"
+DATA = data_directory()
 RESOURCES = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)) / "resources"
 
 
@@ -53,14 +54,14 @@ def _mux(sock, payload):
 
 
 def usb_socket():
-    with socket.create_connection(("127.0.0.1", 27015), timeout=3) as lookup:
+    with usbmux_connection(timeout=3) as lookup:
         reply = _mux(lookup, {"MessageType": "ListDevices"})
     candidates = [d for d in reply.get("DeviceList", [])
                   if d.get("Properties", {}).get("ConnectionType") == "USB"
                   and d.get("Properties", {}).get("ProductID", 0x129E) == 0x129E]
     if not candidates:
         raise ConnectionError("iPod не подключён по USB.")
-    sock = socket.create_connection(("127.0.0.1", 27015), timeout=5)
+    sock = usbmux_connection(timeout=5)
     try:
         reply = _mux(sock, {"MessageType": "Connect", "DeviceID": candidates[0]["DeviceID"],
                             "PortNumber": socket.htons(22)})

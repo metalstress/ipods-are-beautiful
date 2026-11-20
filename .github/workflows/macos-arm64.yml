@@ -1,0 +1,60 @@
+name: Apple Silicon build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feature/macos-arm64]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 35
+    env:
+      QT_QPA_PLATFORM: offscreen
+      MACOSX_DEPLOYMENT_TARGET: '14.4'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: arm64
+      - name: Verify native host
+        run: |
+          test "$(uname -m)" = arm64
+          python -c "import platform; assert platform.machine() == 'arm64'"
+      - name: Install dependencies
+        run: python -m pip install -r imetal/requirements.txt
+      - name: Build and test native signer
+        run: |
+          cargo test --locked --manifest-path modern-ios/signer/Cargo.toml
+          cargo build --locked --release --manifest-path modern-ios/signer/Cargo.toml
+      - name: Application and protocol tests
+        env:
+          HOME: ${{ runner.temp }}/ipods-test-home
+        run: |
+          mkdir -p "$HOME"
+          python -m unittest discover -s imetal -p 'test_*.py'
+          python -m unittest discover -s modern-ios -p 'test_*.py'
+      - name: Build application
+        run: python imetal/build_macos.py
+      - name: Check frozen application
+        run: python tools/check_macos_release.py 'outputs/macos/iPods Are Beautiful.app' work/macos-check
+      - name: Package application
+        run: python tools/package_macos_release.py 'outputs/macos/iPods Are Beautiful.app' outputs/macos-release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macOS-arm64
+          path: outputs/macos-release/*
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macOS-build-checks
+          path: |
+            work/macos-build/build.log
+            work/macos-check/*
+          if-no-files-found: ignore

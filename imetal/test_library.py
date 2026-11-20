@@ -189,9 +189,12 @@ class LibraryTests(unittest.TestCase):
         self.assertEqual(error.exception.code,'invalid_cache_id')
 
     def test_real_child_worker_reads_cache_without_a_device(self):
-        local=self.root/'local';data=local/'iMetal'
+        from host_platform import data_directory
+        local=self.root/'local'
+        environment={'LOCALAPPDATA':str(local),'HOME':str(local),'XDG_DATA_HOME':str(local)}
+        data=data_directory(home=local,environ=environment)
         LibraryCache(data/'library-cache').save('snapshots',self.snapshot)
-        with patch.dict(os.environ,{'LOCALAPPDATA':str(local)}),patch('backend_client.DATA',data):
+        with patch.dict(os.environ,environment),patch('backend_client.DATA',data):
             result=run_backend('library.query',self.config,payload={'snapshot_id':self.snapshot['snapshot_id'],'search':'Second'})
         self.assertEqual(result['items'][0]['title'],'Second')
         self.assertEqual(list((data/'backend-jobs').iterdir()),[])

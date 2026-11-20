@@ -296,6 +296,6 @@ class LibraryInterfaceTests(unittest.TestCase):
         next(b for b in self.pane.overlay.dialog.findChildren(BarButton) if b.text()=='Save').click()
         self.pane.change.assert_called_with([{'action':'update_metadata','track_ids':['1'],'changes':{'year':2022}}])
 
-    def test_release_version_is_111(self):self.assertEqual(VERSION,'1.1.1')
+    def test_release_version_is_120(self):self.assertEqual(VERSION,'1.2.0')
 
 if __name__=='__main__':unittest.main()

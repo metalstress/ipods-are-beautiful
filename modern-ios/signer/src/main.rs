@@ -1,4 +1,4 @@
-//! Windows helper using rustunes' original MIT-licensed fixed-profile signer.
+//! Native helper using rustunes' original MIT-licensed fixed-profile signer.
 //! Pairing keys never enter this process. Only an ATC reply and the exact
 //! operation bytes are read from stdin; only the 21-byte sidecar is returned.
 use std::io::{self, Read, Write};

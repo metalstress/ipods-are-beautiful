@@ -20,6 +20,7 @@ from mutagen.mp4 import MP4, MP4Cover
 from mutagen.mp3 import MP3
 import mutagen
 from transport import DATA, RESOURCES
+from host_platform import executable_name, process_flags
 from pending_imports import interrupted_imports
 
 from pymobiledevice3.exceptions import AfcFileNotFoundError, AfcException
@@ -27,7 +28,7 @@ from pymobiledevice3.lockdown import create_using_usbmux
 from modern_pairing import connect_paired_wifi
 from pymobiledevice3.services.afc import AfcService, AfcError
 
-SIGNER = RESOURCES/'ipods-music-signer.exe'
+SIGNER = RESOURCES/executable_name('ipods-music-signer')
 MUSIC_DIR = '/iTunes_Control/iTunes'
 STAGING = '/iTunes_Control/Sync/Media'
 OPERATION = STAGING + '/Sync_00000000.plist'
@@ -43,7 +44,7 @@ def native_sign(command, data=None):
     if not SIGNER.is_file():
         raise RuntimeError('The Music signing component is missing. Reinstall this build.')
     result = subprocess.run([str(SIGNER), command], input=data, capture_output=True,
-                            creationflags=subprocess.CREATE_NO_WINDOW, timeout=15)
+                            creationflags=process_flags(), timeout=15)
     if result.returncode:
         raise RuntimeError(result.stderr.decode(errors='replace')[-300:])
     return result.stdout
@@ -160,7 +161,7 @@ def prepare_alac(source, cache, stop=None, progress=lambda value:None):
         import tempfile
         with tempfile.TemporaryFile() as error_log:
             process=subprocess.Popen(cmd,stdout=subprocess.PIPE,stderr=error_log,text=True,
-                encoding='utf-8',errors='replace',creationflags=subprocess.CREATE_NO_WINDOW)
+                encoding='utf-8',errors='replace',creationflags=process_flags())
             try:
                 for line in process.stdout:
                     if stop is not None and stop.is_set():

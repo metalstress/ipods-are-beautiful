@@ -3,11 +3,13 @@ from dataclasses import dataclass, field
 import hashlib
 from pathlib import Path
 import subprocess
+import sys
 import threading
 
 import mutagen
 from mutagen.mp4 import MP4, MP4Cover
 from transport import DATA, RESOURCES
+from host_platform import process_flags
 
 EXTENSIONS = {".mp3", ".m4a", ".aac", ".flac", ".wav", ".aif", ".aiff",
               ".ogg", ".oga", ".opus", ".wma", ".ape", ".mpc", ".alac", ".caf"}
@@ -164,11 +166,16 @@ def fingerprint(track, stop):
 
 
 def ffmpeg():
-    packaged = sorted(RESOURCES.glob("ffmpeg*.exe"))
+    packaged = sorted(p for p in RESOURCES.glob("ffmpeg*") if p.is_file()
+                      and (p.suffix.lower() == '.exe') == (sys.platform == 'win32'))
     if packaged:
         return str(packaged[0])
     import imageio_ffmpeg
-    return str(next((Path(imageio_ffmpeg.__file__).parent / "binaries").glob("ffmpeg*.exe")))
+    bundled = sorted(p for p in (Path(imageio_ffmpeg.__file__).parent/'binaries').glob('ffmpeg*')
+                     if p.is_file() and (p.suffix.lower() == '.exe') == (sys.platform == 'win32'))
+    if bundled:
+        return str(bundled[0])
+    return imageio_ffmpeg.get_ffmpeg_exe()
 
 
 def convert(track, stop, progress):
@@ -196,7 +203,7 @@ def convert(track, stop, progress):
     command += ["-progress", "pipe:1", "-nostats", str(temporary)]
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                text=True, encoding="utf-8", errors="replace",
-                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+                               creationflags=process_flags())
     try:
         for line in process.stdout:
             if stop.is_set():
