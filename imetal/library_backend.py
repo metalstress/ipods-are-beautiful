@@ -1,5 +1,6 @@
 """Headless album/track API for the future UI; no Qt or visible controls."""
 import asyncio
+from contextlib import suppress
 import hashlib
 import json
 from pathlib import Path
@@ -15,6 +16,23 @@ from device_lock import device_lock
 def plan_hash(record):
     return hashlib.sha256(json.dumps({k:v for k,v in record.items() if k != 'content_hash'},
         sort_keys=True, ensure_ascii=True, separators=(',', ':')).encode()).hexdigest()
+
+
+async def capture_cancellable(config, stop):
+    if config.get('backend') != 'modern' or stop is None:
+        return await read_device(config, stop)
+    task = asyncio.create_task(read_device(config, stop))
+    try:
+        while not task.done():
+            if stop.is_set():
+                raise LibraryError('cancelled', 'Library read cancelled.')
+            await asyncio.wait({task}, timeout=.1)
+        return await task
+    finally:
+        if not task.done():
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
 
 
 class LibraryCache:
@@ -67,9 +85,12 @@ class LibraryService:
     def execute(self, command, config, payload, emit=lambda e: None, stop=None):
         if not isinstance(payload, dict):
             raise LibraryError('invalid_request', 'Library request must be an object.')
+        if command == 'library.repair_artwork':
+            from artwork_repair import repair_one_album
+            return repair_one_album(config, payload, stop, self)
         if command == 'library.read':
             with device_lock(config):
-                record = self.cache.save('snapshots', asyncio.run(asyncio.wait_for(read_device(config, stop), 120)))
+                record = self.cache.save('snapshots', asyncio.run(asyncio.wait_for(capture_cancellable(config, stop), 120)))
             return summary(record)
         if command == 'library.apply':
             return self.apply(config, payload, emit, stop)

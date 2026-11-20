@@ -22,10 +22,10 @@ import mutagen
 from transport import DATA, RESOURCES
 from pending_imports import interrupted_imports
 
-from pymobiledevice3.exceptions import AfcFileNotFoundError
+from pymobiledevice3.exceptions import AfcFileNotFoundError, AfcException
 from pymobiledevice3.lockdown import create_using_usbmux
 from modern_pairing import connect_paired_wifi
-from pymobiledevice3.services.afc import AfcService
+from pymobiledevice3.services.afc import AfcService, AfcError
 
 SIGNER = RESOURCES/'ipods-music-signer.exe'
 MUSIC_DIR = '/iTunes_Control/iTunes'
@@ -449,7 +449,13 @@ class ModernDevice:
         # Standard Apple sync lock. Do not overlap another Apple/client writer.
         handle=await self.afc.fopen('/com.apple.itunes.lock_sync','r+')
         self.stack.push_async_callback(self.afc.fclose,handle)
-        await asyncio.wait_for(self.afc.lock(handle,6),5)
+        try:
+            await asyncio.wait_for(self.afc.lock(handle,6),5)
+        except AfcException as error:
+            if error.status == AfcError.OP_WOULD_BLOCK:
+                from library_model import LibraryError
+                raise LibraryError('device_busy', 'iPhone is busy with another sync. Try again when it finishes.') from error
+            raise
         await self.staging_empty()
         self.atc=await self.stack.enter_async_context(await self.lockdown.start_lockdown_service('com.apple.atc'))
         await self.send('Ping',session=1)

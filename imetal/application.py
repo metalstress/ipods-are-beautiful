@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import sys
 import threading
+import time
 
 if '--render' in sys.argv:
     os.environ['QT_QPA_PLATFORM'] = 'offscreen'
@@ -73,7 +74,7 @@ class Shell(QFrame):
 
 
 class Window(QMainWindow):
-    def __init__(self, preview=False):
+    def __init__(self, preview=False, maintenance=True):
         super().__init__()
         self.preview = preview
         self.config = settings()
@@ -86,6 +87,9 @@ class Window(QMainWindow):
         self.cards = {}
         self.jobs = []
         self.worker = None
+        self.artwork_job = None
+        self.artwork_checked = {}
+        self.artwork_due = {}
         self.checking = False
         self.scan_serial = 0
         self.quitting = False
@@ -261,6 +265,11 @@ class Window(QMainWindow):
         self.library=LibraryPanel(self)
         self.content_stack.addWidget(self.library)
         self.drop.manageRequested.connect(self.library.open_manager)
+        self.artwork_timer = QTimer(self)
+        self.artwork_timer.setInterval(2000)
+        self.artwork_timer.timeout.connect(self.repair_artwork_background)
+        if not preview and maintenance:
+            self.artwork_timer.start()
         self.upload.setEnabled(not self.auto.isChecked())
         QShortcut(QKeySequence.Delete,self.table,activated=self.remove_selected)
         QShortcut(QKeySequence('Ctrl+O'),self,activated=self.drop.choose_files)
@@ -305,6 +314,9 @@ class Window(QMainWindow):
     def check_connection(self,scan=False):
         if self.checking or self.is_busy():
             return
+        if self.pause_artwork_repair():
+            QTimer.singleShot(250,lambda:self.check_connection(scan=scan))
+            return
         self.checking=True
         if scan and self.scan_serial == 0 and not self.preview:
             self.device_stack.setCurrentWidget(self.scan_spinner)
@@ -322,7 +334,14 @@ class Window(QMainWindow):
         self.scan_button.setEnabled(not self.is_busy())
         self.connect_button.setEnabled(not self.is_busy())
         if result.get('devices'):
+            previous = set(self.devices)
             self.devices={info['id']:info for info in result['devices']}
+            for ident in self.devices.keys() - previous:
+                self.artwork_checked.pop(ident, None)
+                self.artwork_due[ident] = time.monotonic() + 2
+            for ident in previous - self.devices.keys():
+                self.artwork_checked.pop(ident, None)
+                self.artwork_due.pop(ident, None)
             if self.library.device:
                 info=self.devices.get(self.library.device['id'])
                 if info:
@@ -336,6 +355,8 @@ class Window(QMainWindow):
         else:
             if self.library.device:self.library.device_removed(self.library.device['id'])
             self.devices.clear()
+            self.artwork_checked.clear()
+            self.artwork_due.clear()
             self.redraw_devices()
             self.status.setText('No device found — check USB or Wi-Fi')
             self.status.setToolTip(result.get('error',''))
@@ -370,6 +391,10 @@ class Window(QMainWindow):
             self.device_layout.addWidget(card)
 
     def eject(self,device_id):
+        if self.artwork_job and self.artwork_job.device_id == device_id:
+            self.artwork_job.stop.set()
+        self.artwork_checked.pop(device_id, None)
+        self.artwork_due.pop(device_id, None)
         self.library.device_removed(device_id)
         if self.current_device==device_id and self.is_busy():
             self.worker.stop.set()
@@ -381,6 +406,59 @@ class Window(QMainWindow):
 
     def is_busy(self):
         return bool(self.worker and self.worker.isRunning())
+
+    def pause_artwork_repair(self):
+        if self.artwork_job is None:
+            return False
+        self.artwork_job.stop.set()
+        return True
+
+    def repair_artwork_background(self):
+        if (self.preview or self.quitting or self.is_busy() or self.checking or self.artwork_job
+                or self.library.active or self.library.overlay or self.library.selecting
+                or self.library.editing or self.library.playlist_edit
+                or any(task != 'cover' for task, _, _ in self.library.queue)):
+            return
+        now = time.monotonic()
+        info = next((d for d in self.devices.values() if d.get('kind') == 'iphone'
+                     and d.get('config', {}).get('backend') == 'modern'
+                     and self.artwork_due.get(d['id'], 0) <= now), None)
+        if info is None:
+            return
+        from artwork_background import ArtworkJob
+        job = ArtworkJob(info, self.artwork_checked.get(info['id'], set()))
+        self.artwork_job = job
+        self.artwork_due[info['id']] = now + 600
+        self.watch(job, lambda result:self.artwork_repair_result(job, result))
+
+    def artwork_repair_result(self, job, result):
+        if self.artwork_job is job:
+            self.artwork_job = None
+        if self.quitting:
+            return
+        ident = job.device_id
+        if ident in self.devices:
+            checked = self.artwork_checked.setdefault(ident, set())
+            checked.update(result.get('checked_album_ids', []))
+            if result.get('deferred') or result.get('cancelled'):
+                delay = 30
+            elif result.get('remaining') and not result.get('error'):
+                delay = 5
+            else:
+                delay = 600
+            self.artwork_due[ident] = time.monotonic() + delay
+            if not result.get('remaining'):
+                checked.clear()
+            if result.get('repaired') and self.library.device and self.library.device['id'] == ident:
+                self.library.accept_artwork_repair(result)
+        if result.get('error'):
+            try:
+                DATA.mkdir(parents=True, exist_ok=True)
+                with (DATA/'artwork-repair.log').open('a',encoding='utf-8') as log:
+                    log.write(json.dumps({k:v for k,v in result.items() if k not in ('library','changed_covers')})+'\n')
+            except OSError:
+                pass
+        self.library.pump()
 
     def auto_changed(self,checked):
         self.upload.setEnabled(not checked and not self.is_busy())
@@ -438,6 +516,9 @@ class Window(QMainWindow):
             return
         if len(self.devices) > 1:
             self.status.setText('Eject other devices before uploading')
+            return
+        if self.pause_artwork_repair():
+            QTimer.singleShot(250,lambda:self.start(automatic=automatic))
             return
         info=next(iter(self.devices.values()))
         self.current_device_kind=info.get('kind','touch')
@@ -520,6 +601,9 @@ class Window(QMainWindow):
         self.progress_timer.stop()
         if self.quitting:return
         self.worker=None
+        if self.current_device in self.devices:
+            self.artwork_checked.pop(self.current_device, None)
+            self.artwork_due[self.current_device] = time.monotonic() + 1
         self.upload.setEnabled(not self.auto.isChecked())
         for item in [self.mode,self.ip,self.scan_button,self.connect_button,self.auto]:item.setEnabled(True)
         if result.get('error'):
@@ -625,7 +709,7 @@ def main():
         if not lock.tryLock(100):
             QMessageBox.information(None,APP_NAME,'The application is already open.')
             return
-    window=Window(preview=bool(args.render))
+    window=Window(preview=bool(args.render),maintenance=not bool(args.render or args.diagnose_startup))
     if args.diagnose_startup:
         # Initialize the real Windows Qt application and its normal startup
         # scan, but never show a desktop window or enable user input.

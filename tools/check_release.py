@@ -52,6 +52,15 @@ def check(executable, output):
         result = json.loads((job / 'result.json').read_text(encoding='utf-8'))
         assert result.get('tracks_total') == 0 and result.get('errors') == 0, result
 
+        # Import the idle artwork worker without a supported device config;
+        # it must return before any discovery or network/device connection.
+        repair = root / 'artwork-repair';repair.mkdir()
+        (repair/'request.json').write_text(json.dumps({'command':'library.repair_artwork',
+            'config':{'backend':'touch'},'payload':{}}),encoding='utf-8')
+        run([str(executable),'--backend-job',str(repair)])
+        repaired=json.loads((repair/'result.json').read_text(encoding='utf-8'))
+        assert repaired.get('repaired') == 0 and not repaired.get('error'),repaired
+
         # Exercise frozen library imports and request handling without a device.
         from test_library import fixture
         from library_catalogue import read_snapshot
@@ -101,6 +110,7 @@ def check(executable, output):
               'sha256': hashlib.sha256(executable.read_bytes()).hexdigest(),
               'version': VERSION, 'platform': 'Windows x64', 'offscreen_previews': ['empty', 'iphone'],
               'frozen_backend_empty_queue': True, 'packaged_signer': True, 'packaged_ffmpeg': True,
+              'frozen_artwork_repair': True,
               'frozen_library_catalogue': True, 'frozen_playlist_planning': True,
               'embedded_python': True, 'blank_device_defaults': True,
               'runtime_path_has_no_python': True, 'device_connection_attempted': False}

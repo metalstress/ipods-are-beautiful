@@ -1,10 +1,28 @@
 import asyncio
 import unittest
 from unittest.mock import AsyncMock
+from types import SimpleNamespace
 from modern_music import ModernDevice
 
 
 class MusicKeepaliveTests(unittest.IsolatedAsyncioTestCase):
+    async def test_busy_apple_sync_lock_is_reported_before_a_native_session(self):
+        from pymobiledevice3.exceptions import AfcException
+        from pymobiledevice3.services.afc import AfcError
+        from library_model import LibraryError
+        device=ModernDevice('test-phone','.')
+        device.catalogue={}
+        device.afc=SimpleNamespace(fopen=AsyncMock(return_value=42),fclose=AsyncMock(),
+                                  lock=AsyncMock(side_effect=AfcException('busy',AfcError.OP_WOULD_BLOCK)))
+        try:
+            with self.assertRaises(LibraryError) as caught:
+                await device.ready()
+            self.assertEqual(caught.exception.code,'device_busy')
+            self.assertIsNone(device.atc)
+        finally:
+            await device.stack.aclose()
+        device.afc.fclose.assert_awaited_once_with(42)
+
     async def test_ping_is_answered_even_while_audio_body_is_busy(self):
         d=ModernDevice('test-phone','.')
         stalled=asyncio.Event()

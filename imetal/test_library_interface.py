@@ -99,6 +99,24 @@ class LibraryInterfaceTests(unittest.TestCase):
         self.assertEqual(self.pane.cover_requests, {kept})
         self.assertIsNone(self.pane.expanded)
 
+    def test_background_artwork_update_keeps_selection_and_rebinds_a_queued_edit(self):
+        load_preview(self.window,'albums')
+        self.pane.data['device_id']='iphone-test'
+        album,other=self.pane.data['albums'][:2]
+        key=album_cover_key(other['id'])
+        self.pane.show_cover(key,str(ASSETS/'preview-cover.png'))
+        original=self.pane.canvas.load_cover(key)
+        self.pane.selecting=True;self.pane.selected={album['id']};self.pane.expanded=album['id']
+        old=self.pane.data['snapshot_id']
+        self.pane.queue.append(('change',{'snapshot_id':old,'operations':[]},self.pane.generation))
+        result=deepcopy(self.pane.data);result['snapshot_id']='updated-snapshot'
+        data=(ASSETS/'preview-cover.png').read_bytes()
+        self.pane.accept_artwork_repair({'library':result,'changed_covers':{album['artwork_track_id']:data}})
+        self.assertEqual(self.pane.selected,{album['id']})
+        self.assertEqual(self.pane.expanded,album['id'])
+        self.assertIs(self.pane.canvas.covers[key],original)
+        self.assertEqual(self.pane.queue[0][1]['snapshot_id'],'updated-snapshot')
+
     def test_album_reveal_moves_rows_and_finishes_on_the_selected_album(self):
         load_preview(self.window, 'albums')
         canvas = self.pane.canvas
@@ -278,6 +296,6 @@ class LibraryInterfaceTests(unittest.TestCase):
         next(b for b in self.pane.overlay.dialog.findChildren(BarButton) if b.text()=='Save').click()
         self.pane.change.assert_called_with([{'action':'update_metadata','track_ids':['1'],'changes':{'year':2022}}])
 
-    def test_release_version_is_110(self):self.assertEqual(VERSION,'1.1.0')
+    def test_release_version_is_111(self):self.assertEqual(VERSION,'1.1.1')
 
 if __name__=='__main__':unittest.main()

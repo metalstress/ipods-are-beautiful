@@ -199,6 +199,9 @@ class LibraryPanel(QWidget):
 
     def pump(self):
         if self.owner.quitting or not self.queue:return
+        if self.owner.pause_artwork_repair():
+            QTimer.singleShot(250,self.pump)
+            return
         if self.owner.is_busy():
             QTimer.singleShot(500,self.pump)
             return
@@ -395,6 +398,22 @@ class LibraryPanel(QWidget):
                 self.canvas.cover_sources[key] = source
         return [key for key, source in updates.items() if source is None]
 
+    def accept_artwork_repair(self, repair):
+        result = repair.get('library')
+        if not self.data or not result or result['device_id'] != self.data.get('device_id'):
+            return
+        previous = self.data['snapshot_id']
+        position = self.scroll.verticalScrollBar().value()
+        self.reconcile_covers(result, repair.get('changed_covers', {}))
+        self.data = result
+        # A user action queued while the idle job finished must bind to the
+        # verified cover update rather than its now-stale predecessor.
+        self.queue = deque((task, dict(payload, snapshot_id=result['snapshot_id'])
+                            if task == 'change' and payload.get('snapshot_id') == previous else payload, generation)
+                           for task, payload, generation in self.queue)
+        self.refresh()
+        self.scroll.verticalScrollBar().setValue(position)
+
     def clear_covers(self):
         self.cancel_pending_covers()
         self.canvas.covers.clear()
@@ -407,6 +426,7 @@ class LibraryPanel(QWidget):
         if self.overlay:self.overlay.hide();self.overlay.deleteLater();self.overlay=None
 
     def show_dialog(self,dialog,parent=None,dim=False):
+        self.owner.pause_artwork_repair()
         self.close_overlay();self.overlay=Overlay(parent or self,dialog,dim);self.overlay.canceled.connect(self.close_overlay)
 
     def close_library(self):

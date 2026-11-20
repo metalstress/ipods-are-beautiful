@@ -14,13 +14,14 @@ Run the downloaded executable. Python, Rust and build tools are not needed. A [Z
 
 Apple device drivers and the device setup below are still required.
 
-## What works in 1.1.0
+## What works in 1.1.1
 
 - Drag and drop songs, folders or albums.
 - Convert unsupported audio to ALAC. Compatible MP3, AAC and ALAC files pass through without re-encoding.
 - Transfer artwork and tags into the device's Music library.
 - Keep compilation tracks together using release IDs and a shared album artist. Conflicting release tags are left unchanged.
 - Look up missing import artwork through Deezer and MusicBrainz / Cover Art Archive; keep existing covers.
+- Fill missing artwork on local iPhone albums in the background while idle. Uploads and library editing take priority.
 - Upload immediately with **auto upload**, or collect a queue and press **Upload**.
 - Show imported tracks, transferred data, speed and device storage.
 - Check for existing tracks before importing. Keep the original files on the PC.
@@ -40,7 +41,7 @@ Windows 11 x64. Hardware testing was limited to these two devices:
 
 The iPhone album import was checked against the device catalogue and stored files. This does not mean every imported track was listened to end to end.
 
-For **1.1.0**, 142 application tests and 3 additional Music protocol tests passed on November 20, 2026. The standalone executable also passed packaging checks without Python on PATH. The unchanged signer previously passed 4 upstream vector tests. Commands, hardware results and remaining gaps are in [docs/testing.md](docs/testing.md).
+For **1.1.1**, 157 application tests and 3 additional Music protocol tests passed on November 20, 2026. The standalone executable also passed packaging checks without Python on PATH. The unchanged signer previously passed 4 upstream vector tests. Commands, hardware results and remaining gaps are in [docs/testing.md](docs/testing.md).
 
 ## Not supported or not tested
 
@@ -58,6 +59,8 @@ This is a personal prototype. Initial device setup is manual.
 The [native library backend](docs/library-api.md) supports both tested devices. Playlist creation, adding without duplicates, renaming, removing members, clearing and deletion passed hardware checks over USB. Create, add and delete also passed over Wi-Fi. Song records and unrelated playlists were compared before/after. The interface has automated interaction checks; visual review is left to the user.
 
 Compilation regrouping was verified on the iPhone. Missing-cover lookup was checked against the live artwork service; importing a new track with that artwork has not been separately tested on hardware.
+
+Background artwork repair installed a missing cover on eleven existing iPhone songs over Wi-Fi. A second headless check correctly skipped the repaired album.
 
 ## Device setup
 

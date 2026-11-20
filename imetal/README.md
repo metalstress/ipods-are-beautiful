@@ -1,6 +1,6 @@
 # iPods Are Beautiful & I'm No Longer Afraid to Die
 
-Windows music transfer and library manager, version 1.1.0.
+Windows music transfer and library manager, version 1.1.1.
 
 Run iPods Are Beautiful.exe. Python, Rust and build tools are not required.
 
@@ -13,6 +13,8 @@ The tested devices are a jailbroken iPod touch 4 on iOS 6.1.6 and an iPhone 16 P
 iPhone requires Apple device drivers and an existing trusted pairing. Wi-Fi also needs wireless sync enabled. iPod touch requires OpenSSH, Cycript, SSH key authentication and a pinned host key configured in %LOCALAPPDATA%\iMetal\settings.json.
 
 Compatible files pass through unchanged; unsupported formats are converted to ALAC. Original files on the PC are kept. Eject stops the remaining queue after the current import finishes.
+
+While idle, the app checks local iPhone albums for missing artwork and installs matching covers. Checks run after connection and imports; upload and editing take priority. Existing covers and cloud-only songs are skipped.
 
 Settings, cache and transfer journals are stored under %LOCALAPPDATA%\iMetal. No private keys, pairing records, backups or music files are distributed.
 

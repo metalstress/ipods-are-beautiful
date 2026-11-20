@@ -62,6 +62,16 @@ Regression checks cover matching and conflicting release IDs, guest artists, tra
 
 The final 1.1.0 source passed 142 application tests and 3 additional Music protocol tests. Its standalone executable passed the packaging checks above, including the frozen library catalogue and playlist-planning entry points. The signer implementation is unchanged.
 
+### Background artwork repair — 1.1.1
+
+The app checks connected iPhones while idle and after imports, one album per job. It updates only local, editable tracks that still lack artwork in a fresh capture. An existing cover from another song in the album is preferred; otherwise the existing online sources are used. Prepared download files are removed after verified completion. Inputs for an indeterminate native operation are retained for recovery, and that operation is not blindly repeated. Empty lookup results are skipped. Apple sync-lock contention defers the job.
+
+The Day Is My Enemy by The Prodigy was missing artwork on eleven local iPhone songs. The repair path installed the online cover over paired Wi-Fi. The native mutation API checked the registered artwork IDs and downloaded the installed original bytes for every selected track. Song IDs, audio paths, file sizes, other metadata and unrelated song records were compared before/after. An initial busy Apple sync lock was left intact; a later fresh attempt succeeded.
+
+Regression checks cover protected/cloud exclusions, preserving a cover added during lookup, cancellation, upload priority, large-album batching, partial-album cover reuse, input cleanup, uncertain-operation recovery and retaining the current library view after a background update. The first implementation targets the tested iPhone; automatic background repair on iPod is not enabled.
+
+157 application tests and 3 additional protocol tests passed for 1.1.1. The real headless worker was also run against the already-repaired Prodigy album over Wi-Fi and correctly performed no second mutation.
+
 ```powershell
 python tools/check_release.py path/to/iPods-Are-Beautiful-Windows-x64.exe path/to/check-output
 ```

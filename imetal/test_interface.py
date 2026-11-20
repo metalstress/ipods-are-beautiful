@@ -62,6 +62,36 @@ class InterfaceTests(unittest.TestCase):
         self.window.watch.assert_called_once()
         self.assertFalse(self.window.upload.isEnabled())
 
+    def test_upload_cancels_idle_artwork_work_before_starting_the_transfer(self):
+        self.window.auto.setChecked(False)
+        self.window.paths=[self.a]
+        repair=Mock(device_id='phone',stop=threading.Event())
+        self.window.artwork_job=repair
+        with patch('application.QTimer.singleShot'):
+            self.window.start()
+        self.assertTrue(repair.stop.is_set())
+        self.window.watch.assert_not_called()
+        self.window.artwork_job=None
+        self.window.start()
+        self.window.watch.assert_called_once()
+
+    def test_idle_artwork_check_waits_while_the_user_edits(self):
+        self.window.devices={'phone':{'id':'phone','kind':'iphone','config':{'backend':'modern'}}}
+        self.window.library.selecting=True
+        with patch('artwork_background.ArtworkJob') as job:
+            self.window.repair_artwork_background()
+        job.assert_not_called()
+
+    def test_idle_artwork_check_runs_without_changing_transfer_progress(self):
+        self.window.devices={'phone':{'id':'phone','kind':'iphone','config':{'backend':'modern'}}}
+        before=self.window.last_progress.copy()
+        with patch('artwork_background.ArtworkJob') as job:
+            self.window.repair_artwork_background()
+        job.assert_called_once()
+        self.window.watch.assert_called_once()
+        self.assertEqual(self.window.last_progress,before)
+        self.window.artwork_job=None
+
     def test_auto_upload_starts_and_manual_button_stays_disabled(self):
         self.window.auto.setChecked(True)
         self.window.add_paths([str(self.a)])
